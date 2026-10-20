@@ -104,6 +104,20 @@ def show_notes(notes):
             st.markdown(escape(note["body"]))
 
 
+def go_to_product(product_id, key, label="この製品の情報を見る"):
+    """押すと、その製品を選んだ状態で製品情報画面に移動するボタンを表示します。"""
+    if st.button(label, key=key):
+        st.session_state["goto_product_id"] = int(product_id)
+        st.switch_page("pages/製品情報.py")
+
+
+def go_to_disease(disease_id, key, label="この疾患の情報を見る"):
+    """押すと、その疾患を選んだ状態で疾患情報画面に移動するボタンを表示します。"""
+    if st.button(label, key=key):
+        st.session_state["goto_disease_id"] = int(disease_id)
+        st.switch_page("pages/疾患情報.py")
+
+
 def show_planned(step, what):
     """まだ作っていない機能の場所に、いつ作るかを表示します。"""
     st.info(f"{what}は Step {step} で作ります。")

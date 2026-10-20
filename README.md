@@ -78,6 +78,8 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 | `db/backup.py` | バックアップと復元 |
 | `db/queries.py` | 画面に表示するデータを取り出す処理 |
 | `components/display.py` | 画面で共通して使う表示の部品（確認状態の印・出典の表示など） |
+| `services/search.py` | 横断検索（製品・疾患・文書・医学的情報をまとめて探す） |
+| `services/comparison.py` | 競合製品比較の表と、出典の一覧を作る処理 |
 | `services/sample_loader.py` | 架空データのCSVをデータベースに登録する処理 |
 | `services/` | CSVインポートなど、画面から使う処理 |
 | `data/templates/` | CSVテンプレート（見出し行のみ） |
@@ -100,7 +102,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 - [x] Step 3：テーブル作成・品質を守る仕組み・バックアップと復元
 - [x] Step 4：架空データの登録
 - [x] Step 5：製品・疾患画面
-- [ ] Step 6：横断検索・競合製品比較
+- [x] Step 6：横断検索・競合製品比較
 - [ ] Step 7：確認・更新管理画面
 - [ ] Step 8：CSVインポート
 - [ ] Step 9：承認・再審査・特許・ライセンス

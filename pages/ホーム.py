@@ -4,10 +4,14 @@
 登録件数の一覧、横断検索の入力欄、各画面への入口を表示します。
 """
 
+from contextlib import closing
+
 import streamlit as st
 
+from components.display import escape, go_to_disease, go_to_product, show_fact
 from db.database import get_connection
 from db.queries import get_home_counts
+from services.search import search_all
 
 st.title("💊 MedKnowledge Hub")
 st.write("製品・競合製品・疾患・文書の公開情報を整理し、検索・比較・学習するためのアプリです。")
@@ -40,12 +44,59 @@ st.divider()  # 区切り線
 st.subheader("🔍 横断検索")
 keyword = st.text_input(
     "キーワード",
-    placeholder="販売名・一般名・疾患名などを入力",
+    placeholder="販売名・一般名・企業名・疾患名・文書名・医学的情報の内容などを入力",
     label_visibility="collapsed",  # 見出しと重なるので、入力欄のラベルは隠す
 )
-if keyword:
-    # 検索の仕組みは Step 6 で作る。今は入力されたことだけを表示する
-    st.info(f"「{keyword}」の検索は Step 6 で使えるようになります。")
+st.caption("空白で区切って複数の語を入れると、すべての語を含むものを探します。")
+
+if keyword.strip():
+    with closing(get_connection()) as conn:
+        results = search_all(conn, keyword)
+    total = sum(len(v) for v in results.values())
+
+    if total == 0:
+        st.info(f"「{keyword}」に一致する情報は見つかりませんでした。")
+    else:
+        st.success(f"「{keyword}」の検索結果：{total} 件")
+
+    # 種類ごとに、件数つきの折りたたみ欄（expander）で表示する
+    if results["products"]:
+        with st.expander(f"💊 製品（{len(results['products'])} 件）", expanded=True):
+            for p in results["products"]:
+                st.markdown(f"**{escape(p['brand_name'])}**（{escape(p['generic_name'] or '—')}／{p['category']}）")
+                go_to_product(p["id"], key=f"search_product_{p['id']}")
+
+    if results["diseases"]:
+        with st.expander(f"🩺 疾患（{len(results['diseases'])} 件）", expanded=True):
+            for d in results["diseases"]:
+                english = f"（{escape(d['name_en'])}）" if d["name_en"] else ""
+                st.markdown(f"**{escape(d['name_ja'])}**{english}")
+                go_to_disease(d["id"], key=f"search_disease_{d['id']}")
+
+    if results["documents"]:
+        with st.expander(f"📄 文書（{len(results['documents'])} 件）", expanded=True):
+            for doc in results["documents"]:
+                st.markdown(f"**{escape(doc['title'])}**（{doc['doc_type']}）")
+                if doc["product_id"]:
+                    go_to_product(doc["product_id"], key=f"search_doc_p_{doc['id']}", label="関連する製品を見る")
+                elif doc["disease_id"]:
+                    go_to_disease(doc["disease_id"], key=f"search_doc_d_{doc['id']}", label="関連する疾患を見る")
+
+    if results["facts"]:
+        with st.expander(f"📋 医学的情報（{len(results['facts'])} 件）", expanded=True):
+            for fact in results["facts"]:
+                subject = " × ".join(x for x in (fact["subject_product"], fact["subject_disease"]) if x)
+                show_fact(fact, title=f"{subject}：{fact['fact_type']}")
+                if fact["subject_product_id"]:
+                    go_to_product(fact["subject_product_id"], key=f"search_fact_{fact['id']}")
+                else:
+                    go_to_disease(fact["subject_disease_id"], key=f"search_fact_{fact['id']}")
+
+    if results["safety"]:
+        with st.expander(f"⚠️ 安全性情報（{len(results['safety'])} 件）", expanded=True):
+            for fact in results["safety"]:
+                show_fact(fact, title=f"{fact['subject_product']}：{fact['category']}")
+                go_to_product(fact["subject_product_id"], key=f"search_safety_{fact['id']}")
 
 st.divider()
 

@@ -11,7 +11,7 @@ from contextlib import closing
 import streamlit as st
 
 from components.display import (
-    DISEASE_OVERVIEW_ORDER, DISEASE_TREATMENT_ORDER, STATUS_LEGEND, escape, show_documents,
+    DISEASE_OVERVIEW_ORDER, DISEASE_TREATMENT_ORDER, STATUS_LEGEND, escape, go_to_product, show_documents,
     show_fact, show_facts_in_order, show_notes, show_planned,
 )
 from db.database import get_connection
@@ -86,9 +86,7 @@ with tabs[2]:
             else:
                 st.warning("効能・効果の文言が、出典付きで登録されていません。")
             # ボタンを押したら、その製品を選んだ状態で製品情報画面に移動する
-            if st.button("この製品の情報を見る", key=f"to_product_{product['id']}"):
-                st.session_state["goto_product_id"] = product["product_id"]
-                st.switch_page("pages/製品情報.py")
+            go_to_product(product["product_id"], key=f"to_product_{product['id']}")
 
 with tabs[3]:
     show_planned(10, "この疾患の臨床試験の一覧")

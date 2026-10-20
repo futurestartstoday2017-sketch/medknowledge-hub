@@ -89,7 +89,7 @@ def get_product(conn, product_id):
 
 def get_product_companies(conn, product_id):
     """製品の製造販売元・販売元を、出典付きで返します（content 列に企業名が入ります）。"""
-    return _facts(
+    return fetch_facts(
         conn, "product_companies", "f.product_id = ?", (product_id,),
         extra_columns="c.name_ja AS content",
         extra_join="JOIN companies c ON c.id = f.company_id",
@@ -99,7 +99,7 @@ def get_product_companies(conn, product_id):
 
 def get_product_facts(conn, product_id):
     """製品が対象の医学的情報（薬効分類・作用機序など）を、出典付きで返します。"""
-    return _facts(conn, "medical_facts", "f.product_id = ?", (product_id,))
+    return fetch_facts(conn, "medical_facts", "f.product_id = ?", (product_id,))
 
 
 def get_product_indications(conn, product_id):
@@ -110,14 +110,14 @@ def get_product_indications(conn, product_id):
         WHERE i.product_id = ? ORDER BY d.name_ja
     """, (product_id,)).fetchall()
     return [
-        {**dict(i), "facts": _facts(conn, "medical_facts", "f.indication_id = ?", (i["id"],))}
+        {**dict(i), "facts": fetch_facts(conn, "medical_facts", "f.indication_id = ?", (i["id"],))}
         for i in indications
     ]
 
 
 def get_safety_info(conn, product_id):
     """製品の安全性情報を、出典付きで返します。"""
-    return _facts(conn, "safety_info", "f.product_id = ?", (product_id,))
+    return fetch_facts(conn, "safety_info", "f.product_id = ?", (product_id,))
 
 
 # ---------------------------------------------------------------------
@@ -149,7 +149,7 @@ def get_disease(conn, disease_id):
 
 def get_disease_facts(conn, disease_id):
     """疾患が対象の医学的情報（疾患概要・診断・治療など）を、出典付きで返します。"""
-    return _facts(conn, "medical_facts", "f.disease_id = ?", (disease_id,))
+    return fetch_facts(conn, "medical_facts", "f.disease_id = ?", (disease_id,))
 
 
 def get_disease_products(conn, disease_id):
@@ -161,7 +161,7 @@ def get_disease_products(conn, disease_id):
         ORDER BY CASE p.category WHEN '対象企業' THEN 0 ELSE 1 END, p.brand_name
     """, (disease_id,)).fetchall()
     return [
-        {**dict(p), "facts": _facts(conn, "medical_facts", "f.indication_id = ?", (p["id"],))}
+        {**dict(p), "facts": fetch_facts(conn, "medical_facts", "f.indication_id = ?", (p["id"],))}
         for p in products
     ]
 
@@ -213,7 +213,7 @@ def get_notes(conn, product_id=None, disease_id=None):
 # 補助関数
 # ---------------------------------------------------------------------
 
-def _facts(conn, table, where, params, extra_columns=None, extra_join="", order="f.id"):
+def fetch_facts(conn, table, where, params, extra_columns=None, extra_join="", order="f.id"):
     """
     事実のテーブルから「今の情報」を、出典（文書名・版・URL）と一緒に取り出し、辞書のリストで返します。
     where・order などはこのファイルの中で決めた文字だけを渡します（利用者の入力は params で渡す）。
