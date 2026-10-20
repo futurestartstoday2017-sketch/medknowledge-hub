@@ -8,9 +8,9 @@ from contextlib import closing
 
 import streamlit as st
 
-from components.display import escape, go_to_disease, go_to_product, show_fact
+from components.display import escape, go_to_disease, go_to_product, go_to_trial, show_fact, status_label
 from db.database import get_connection
-from db.queries import get_home_counts
+from db.queries import get_home_counts, trial_code
 from services.search import search_all
 
 st.title("💊 MedKnowledge Hub")
@@ -23,10 +23,11 @@ try:
 finally:
     conn.close()  # 使い終わった接続は必ず閉じる
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col_trials, col4 = st.columns(5)
 col1.metric("登録製品数", counts["products"])
 col2.metric("登録疾患数", counts["diseases"])
 col3.metric("登録文書数", counts["documents"])
+col_trials.metric("登録試験数", counts["trials"], help="複数のレジストリに登録された試験も1件として数えています")
 col4.metric(
     "更新確認待ち",
     counts["unverified"] + counts["recheck"],
@@ -44,7 +45,7 @@ st.divider()  # 区切り線
 st.subheader("🔍 横断検索")
 keyword = st.text_input(
     "キーワード",
-    placeholder="販売名・一般名・企業名・疾患名・文書名・医学的情報の内容などを入力",
+    placeholder="販売名・一般名・企業名・疾患名・文書名・医学的情報の内容・試験名・登録番号などを入力",
     label_visibility="collapsed",  # 見出しと重なるので、入力欄のラベルは隠す
 )
 st.caption("空白で区切って複数の語を入れると、すべての語を含むものを探します。")
@@ -98,11 +99,18 @@ if keyword.strip():
                 show_fact(fact, title=f"{fact['subject_product']}：{fact['category']}")
                 go_to_product(fact["subject_product_id"], key=f"search_safety_{fact['id']}")
 
+    if results["trials"]:
+        with st.expander(f"🧪 臨床試験（{len(results['trials'])} 件）", expanded=True):
+            for trial in results["trials"]:
+                st.markdown(f"**{trial_code(trial['trial_id'])}**　{escape(trial['title'])}"
+                            f"（{trial['phase']}）　{status_label(trial['status'])}")
+                go_to_trial(trial["trial_id"], key=f"search_trial_{trial['trial_id']}")
+
 st.divider()
 
 # ---- 各画面への入口 ----
 st.subheader("メニュー")
-nav1, nav2, nav3, nav4, nav5 = st.columns(5)
+nav1, nav2, nav3, nav_trials, nav4, nav5 = st.columns(6)
 # st.page_link：押すとその画面に移動するリンク
 nav1.page_link("pages/製品情報.py", label="製品情報", icon="💊")
 nav1.caption("製品の一覧・詳細、適応症、安全性情報")
@@ -110,6 +118,8 @@ nav2.page_link("pages/疾患情報.py", label="疾患情報", icon="🩺")
 nav2.caption("疾患の一覧・詳細、関連製品、関連文献")
 nav3.page_link("pages/競合製品比較.py", label="競合製品比較", icon="📊")
 nav3.caption("同じ適応症の製品を出典つきで比較")
+nav_trials.page_link("pages/臨床試験.py", label="臨床試験", icon="🧪")
+nav_trials.caption("製品・疾患ごとの臨床試験と登録番号")
 nav4.page_link("pages/更新管理.py", label="更新管理", icon="🔄")
 nav4.caption("原文の確認、内容の修正、文書の改訂、更新履歴")
 nav5.page_link("pages/データ管理.py", label="データ管理", icon="🗂️")

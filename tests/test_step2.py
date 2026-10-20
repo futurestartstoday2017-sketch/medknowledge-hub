@@ -19,12 +19,12 @@ PAGES = [
 ]
 
 
-def test_home_shows_four_counts():
-    """起動するとホーム画面が開き、4つの件数欄が表示されるか確認します。"""
+def test_home_shows_counts():
+    """起動するとホーム画面が開き、件数欄が表示されるか確認します（登録試験数は Step 10 で追加）。"""
     at = AppTest.from_file(APP).run()
     assert not at.exception
     labels = [m.label for m in at.metric]
-    assert labels == ["登録製品数", "登録疾患数", "登録文書数", "更新確認待ち"]
+    assert labels == ["登録製品数", "登録疾患数", "登録文書数", "登録試験数", "更新確認待ち"]
 
 
 def test_home_search_box_responds():

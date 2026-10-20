@@ -2,16 +2,22 @@
 database.py：データベース（SQLite）への接続と、テーブルの作成を担当するファイルです。
 
 - get_connection()：データベースに接続する（外部キーのチェックを必ず有効にする）
+- get_mode() / set_mode()：使うデータベース（架空データ用 / 実データ用）の確認と切り替え
 - init_db()       ：DBを最新の設計図の形にする（新しく作る／マイグレーションで追加する）
 """
 
+import json
 import sqlite3
 from pathlib import Path
 
 # プロジェクトのフォルダ（このファイルの1つ上のフォルダ）
 ROOT = Path(__file__).parent.parent
 # データベースファイルの場所
-DB_PATH = ROOT / "data" / "medknowledge.db"
+DB_PATH = ROOT / "data" / "medknowledge.db"            # 架空データ（動作確認用）のデータベース
+REAL_DB_PATH = ROOT / "data" / "medknowledge_real.db"  # 実データのデータベース（架空データは読み込まない）
+# どちらのデータベースを使うかを覚えておく設定ファイル（このPCだけの設定なので GitHub には上げない）
+CONFIG_PATH = ROOT / "data" / "app_config.json"
+MODES = {"sample": "🧪 架空データ（動作確認用）", "real": "📘 実データ"}
 # テーブルの設計図（SQL）の場所
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
@@ -108,9 +114,31 @@ TABLE_LABELS = {
 }
 
 
+def get_mode():
+    """今使っているデータベースの種類（"sample"＝架空データ / "real"＝実データ）を返します。"""
+    try:
+        mode = json.loads(Path(CONFIG_PATH).read_text(encoding="utf-8")).get("mode")
+    except (FileNotFoundError, json.JSONDecodeError):
+        return "sample"  # 設定がなければ、架空データ（動作確認用）を使う
+    return mode if mode in MODES else "sample"
+
+
+def set_mode(mode):
+    """使うデータベースの種類を切り替えて、設定ファイルに保存します。"""
+    if mode not in MODES:
+        raise ValueError(f"データベースの種類は {list(MODES)} のどちらかにしてください")
+    Path(CONFIG_PATH).parent.mkdir(parents=True, exist_ok=True)
+    Path(CONFIG_PATH).write_text(json.dumps({"mode": mode}, ensure_ascii=False), encoding="utf-8")
+
+
+def current_db_path():
+    """今使うデータベースファイルの場所を返します（get_mode() の結果で決まる）。"""
+    return REAL_DB_PATH if get_mode() == "real" else DB_PATH
+
+
 def get_connection(db_path=None):
-    """データベースに接続し、接続（コネクション）を返します。"""
-    conn = sqlite3.connect(db_path or DB_PATH)
+    """データベースに接続し、接続（コネクション）を返します。場所を指定しなければ、今使うデータベースにつなぎます。"""
+    conn = sqlite3.connect(db_path or current_db_path())
     # 結果を「列名でアクセスできる形」で受け取る設定（row["brand_name"] のように使える）
     conn.row_factory = sqlite3.Row
     # SQLiteは初期設定では外部キーのチェックが無効なので、接続のたびに有効にする
@@ -127,7 +155,7 @@ def init_db(db_path=None):
     - 最新のDB：何もしない
     新しいDBも古いDBも同じ手順を通るので、「新しく作ったDB」と「追加したDB」の形が食い違いません。
     """
-    path = Path(db_path or DB_PATH)
+    path = Path(db_path or current_db_path())
     path.parent.mkdir(parents=True, exist_ok=True)  # data フォルダがなければ作る
 
     conn = get_connection(path)

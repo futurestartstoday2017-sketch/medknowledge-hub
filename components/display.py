@@ -186,6 +186,56 @@ def show_timeline(timeline):
                               for p in timeline["patents"]))
 
 
+def trial_date(value, kind):
+    """試験の日付を「2025-04（実績）」の形にします（日付がなければ「—」）。"""
+    return f"{value}（{kind}）" if value else "—"
+
+
+def trials_table(trials, product_id=None):
+    """
+    臨床試験のリスト（db/queries.py の list_trials() の結果）を、一覧の表にします。
+    product_id を渡すと、その製品の役割（試験薬・対照薬など）の列を付けます。
+    """
+    rows = []
+    for trial in trials:
+        detail = trial["detail"] or {}
+        row = {"研究ID": trial["code"]}
+        if product_id is not None:
+            row["この製品の役割"] = "・".join(p["role"] for p in trial["products"] if p["product_id"] == product_id)
+        row.update({
+            "研究タイトル": detail.get("title", "（内容が未登録）"),
+            "フェーズ": detail.get("phase", "—"),
+            "募集状況": detail.get("recruitment_status", "—"),
+            "スポンサー": detail.get("sponsor_company") or detail.get("sponsor_text") or "—",
+            "試験薬": "、".join(p["brand_name"] for p in trial["products"] if p["role"] == "試験薬") or "—",
+            "対照薬": "、".join(p["brand_name"] for p in trial["products"] if p["role"] == "対照薬") or "—",
+            "研究開始日": trial_date(detail.get("start_date"), detail.get("start_date_type")),
+            "研究終了日": trial_date(detail.get("end_date"), detail.get("end_date_type")),
+            "登録番号": "、".join(f"{r['registry']}：{r['registration_no']}" for r in trial["registrations"]),
+            "確認状態": status_label(detail["status"]) if detail else "—",
+        })
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def go_to_trial(trial_id, key, label="この試験の詳細を見る"):
+    """押すと、その試験を選んだ状態で臨床試験画面に移動するボタンを表示します。"""
+    if st.button(label, key=key):
+        st.session_state["goto_trial_id"] = int(trial_id)
+        st.switch_page("pages/臨床試験.py")
+
+
+def show_trials_with_links(trials, key_prefix, product_id=None, empty_message="臨床試験は登録されていません。"):
+    """試験の一覧の表と、選んだ試験の詳細へ移動するボタンを表示します（製品・疾患の画面で使う）。"""
+    if not trials:
+        st.info(empty_message)
+        return
+    st.dataframe(trials_table(trials, product_id), hide_index=True)
+    codes = {t["trial_id"]: f"{t['code']}　{(t['detail'] or {}).get('title', '')}" for t in trials}
+    chosen = st.selectbox("詳しく見る試験", list(codes), format_func=lambda i: codes[i], key=f"{key_prefix}_trial")
+    go_to_trial(chosen, key=f"{key_prefix}_go_trial")
+
+
 def go_to_product(product_id, key, label="この製品の情報を見る"):
     """押すと、その製品を選んだ状態で製品情報画面に移動するボタンを表示します。"""
     if st.button(label, key=key):

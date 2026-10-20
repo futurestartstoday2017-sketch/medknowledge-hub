@@ -22,6 +22,8 @@ def isolated_app_db(tmp_path, monkeypatch):
     データベースとバックアップの場所を使い捨ての場所に差し替えます。
     """
     monkeypatch.setattr(db.database, "DB_PATH", tmp_path / "app.db")
+    monkeypatch.setattr(db.database, "REAL_DB_PATH", tmp_path / "app_real.db")
+    monkeypatch.setattr(db.database, "CONFIG_PATH", tmp_path / "app_config.json")
     monkeypatch.setattr(db.backup, "BACKUP_DIR", tmp_path / "backups")
     st.cache_resource.clear()  # 「最初の1回だけ」のDB準備を、テストごとにやり直させる
     yield

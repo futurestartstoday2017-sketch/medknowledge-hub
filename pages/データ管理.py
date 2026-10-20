@@ -3,6 +3,7 @@
 
   1. CSVインポート：テンプレートに記入したCSVを検証し、誤りがなければ確認してから登録する
   2. バックアップ ：バックアップの作成と一覧、復元のしかた
+  3. データベースの切り替え：架空データ（動作確認用）と実データのデータベースを切り替える
 
 CSVで取り込んだ医学的情報は「⚠️ 未確認」で登録されます。
 原文を確認したら、更新管理画面で「原文確認済み」にしてください。
@@ -16,24 +17,30 @@ import pandas as pd
 import streamlit as st
 
 from db.backup import BACKUP_DIR, backup_db
-from db.database import get_connection
+from db.database import MODES, current_db_path, get_connection, get_mode, set_mode
 from db.errors import friendly_db_error
 from db.settings import get_setting, set_setting
-from services.csv_importer import KINDS, example_table, import_rows, read_csv, template_bytes, validate
+from services.csv_importer import (
+    ENTRY_METHODS, KINDS, example_table, import_rows, read_csv, template_bytes, validate,
+)
+
+# 「このCSVを作成したのは」の選択肢の説明
+ENTRY_LABELS = {"CSV": "人（公式資料などを見ながら作成）", "AI抽出": "AI（Claude などが調査して作成）"}
 
 st.title("🗂️ データ管理")
 
 if "flash" in st.session_state:
     st.success(st.session_state.pop("flash"))
 
-tabs = st.tabs(["CSVインポート", "バックアップ"])
+tabs = st.tabs(["CSVインポート", "バックアップ", "データベースの切り替え"])
+st.caption(f"使用中のデータ：{MODES[get_mode()]}（{current_db_path().name}）")
 
 # =====================================================================
 # 1. CSVインポート
 # =====================================================================
 with tabs[0]:
-    st.caption("取り込む順番：① 企業・製品・疾患 → ② 文書と版 → ③ 適応症 → ④ 承認・再審査・特許・ライセンス・PMS"
-               "（先に登録したものを、あとのCSVで参照するため）")
+    st.caption("取り込む順番：① 企業・製品・疾患 → ② 文書と版 → ③ 適応症・臨床試験 → "
+               "④ 承認・再審査・特許・ライセンス・PMS（先に登録したものを、あとのCSVで参照するため）")
 
     kind = st.radio("取り込む種類", list(KINDS), format_func=lambda k: KINDS[k]["label"], horizontal=True,
                     key="import_kind")
@@ -86,6 +93,11 @@ with tabs[0]:
             with st.form("import_form"):
                 reviewer = st.text_input("確認者名（必須）", value=last_reviewer, key="import_reviewer")
                 reason = st.text_input("登録の理由（必須）", value=f"CSVインポート（{uploaded.name}）", key="import_reason")
+                entry_method = st.radio(
+                    "このCSVを作成したのは", ENTRY_METHODS, format_func=lambda m: ENTRY_LABELS[m], horizontal=True,
+                    key="import_entry",
+                    help="医学的情報・試験などの「入力方法」として記録します。どちらも「⚠️ 未確認」で登録され、"
+                         "原文を確認してから「原文確認済み」にします。")
                 checked = st.checkbox("上の内容を確認しました", key="import_checked")
                 if st.form_submit_button("この内容で登録する", type="primary", key="import_submit"):
                     if not reviewer.strip() or not reason.strip():
@@ -96,7 +108,8 @@ with tabs[0]:
                         try:
                             backup_path = backup_db()  # 登録の前に、必ずバックアップを取る
                             with closing(get_connection()) as conn:
-                                count = import_rows(conn, kind, table, reviewer.strip(), reason.strip())
+                                count = import_rows(conn, kind, table, reviewer.strip(), reason.strip(),
+                                                    entry_method)
                                 set_setting(conn, "last_reviewer", reviewer.strip())
                         except (sqlite3.IntegrityError, ValueError) as error:
                             st.error(f"登録できませんでした（データは変更されていません）：{friendly_db_error(error)}")
@@ -104,7 +117,7 @@ with tabs[0]:
                             st.session_state["flash"] = (
                                 f"{spec['label']}を {count} 行登録しました（登録前のバックアップ：{backup_path.name}）。"
                                 + ("医学的情報は「⚠️ 未確認」です。更新管理画面で原文を確認してください。"
-                                   if kind == "indications" or "fact_table" in spec else ""))
+                                   if kind in ("indications", "trials") or "fact_table" in spec else ""))
                             # アップロード欄を空に戻す（同じファイルを二重に登録しないため）
                             st.session_state.pop(f"upload_{kind}", None)
                             st.rerun()
@@ -138,3 +151,20 @@ with tabs[1]:
                 "2. 次のコマンドを入力します（ファイル名は上の一覧から選んでください）。")
     st.code("python -m db.backup restore data\\backups\\ファイル名.db", language="powershell")
     st.markdown("3. もう一度 `streamlit run app.py` で起動します。")
+
+# =====================================================================
+# 3. データベースの切り替え
+# =====================================================================
+with tabs[2]:
+    st.markdown("架空データ（動作確認用）と実データは、**別々のデータベース**に保存します。混ざらないようにするためです。")
+    st.markdown("- 🧪 **架空データ**：動作確認・練習用。最初から架空のサンプルデータが入っています（`medknowledge.db`）。")
+    st.markdown("- 📘 **実データ**：実在の製品・試験などを登録する用。架空データは入りません（`medknowledge_real.db`）。")
+    st.caption("切り替えても、もう一方のデータベースは消えません。いつでも戻せます。バックアップも別々の名前で保存されます。")
+
+    current = get_mode()
+    target = st.radio("使うデータベース", list(MODES), index=list(MODES).index(current),
+                      format_func=lambda m: MODES[m], key="db_mode")
+    if target != current and st.button(f"{MODES[target]} に切り替える", type="primary", key="db_switch"):
+        set_mode(target)
+        st.session_state["flash"] = f"使うデータベースを {MODES[target]} に切り替えました。"
+        st.rerun()  # 画面を読み込み直す（app.py が切り替え先のデータベースを準備する）

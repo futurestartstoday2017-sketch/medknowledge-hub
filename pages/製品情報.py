@@ -13,11 +13,13 @@ import streamlit as st
 from components.display import (
     DISCLOSURE_LEGEND, PRODUCT_FACT_ORDER, SAFETY_ORDER, STATUS_LEGEND, disclosed_value, escape, go_to_disease,
     show_documents, show_fact, show_facts_in_order, show_facts_table, show_notes, show_timeline,
+    show_trials_with_links,
 )
 from db.database import get_connection
 from db.queries import (
     get_documents, get_notes, get_product, get_product_companies, get_product_facts,
-    get_product_indications, get_product_regulatory, get_safety_info, list_products,
+    get_product_indications, get_product_regulatory, get_safety_info, list_products, list_trials,
+    trial_codes_by_registration,
 )
 from services.timeline import build_timeline
 
@@ -60,6 +62,9 @@ with closing(get_connection()) as conn:
     documents = get_documents(conn, product_id=selected_id)
     notes = get_notes(conn, product_id=selected_id)
     regulatory = get_product_regulatory(conn, selected_id)
+    # この製品が試験薬・対照薬などになっている臨床試験
+    product_trials = [t for t in list_trials(conn) if any(p["product_id"] == selected_id for p in t["products"])]
+    trial_codes = trial_codes_by_registration(conn)
     timeline = build_timeline(conn, selected_id)
 
 st.divider()
@@ -75,7 +80,8 @@ col3.markdown(
 )
 col4.markdown(f"**最終確認日**  \n{product['last_checked_on'] or '未確認'}")
 
-tabs = st.tabs(["基本情報", "適応症", "安全性情報", "承認・再審査・PMS", "ライセンス・特許", "文書", "学習メモ"])
+tabs = st.tabs(["基本情報", "適応症", "安全性情報", "承認・再審査・PMS", "ライセンス・特許", "臨床試験", "文書",
+               "学習メモ"])
 
 with tabs[0]:
     st.subheader("製造販売元・販売元")
@@ -132,6 +138,7 @@ with tabs[3]:
         ("実施期間", lambda f: disclosed_value(
             f["disclosure"], f"{f['start_date'] or '?'} 〜 {f['end_date'] or '（終了日なし）'}")),
         ("登録番号", lambda f: f["registration_no"] or "—"),
+        ("対応する臨床試験", lambda f: trial_codes.get(f["registration_no"], "—")),
     ], "PMSは登録されていません。")
 
 with tabs[4]:
@@ -158,7 +165,11 @@ with tabs[4]:
     ], "特許は登録されていません。")
 
 with tabs[5]:
-    show_documents(documents)
+    show_trials_with_links(product_trials, "product", product_id=selected_id,
+                           empty_message="この製品が試験薬・対照薬になっている臨床試験は登録されていません。")
 
 with tabs[6]:
+    show_documents(documents)
+
+with tabs[7]:
     show_notes(notes)

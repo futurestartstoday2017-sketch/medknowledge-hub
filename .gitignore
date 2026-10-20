@@ -26,3 +26,6 @@ data/backups/
 
 # 実データの取り込み用CSV（AIが調査して作成したものを含む。公開リポジトリには上げない）
 data/imports/
+
+# どちらのデータベース（架空データ／実データ）を使うかの、このPCだけの設定
+data/app_config.json

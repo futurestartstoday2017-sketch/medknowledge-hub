@@ -118,7 +118,9 @@ def test_disease_notes_are_separated_from_facts():
 def test_disease_to_product_navigation():
     """関連製品のボタンを押すと、その製品が選ばれた状態で製品情報画面に移動することを確認します。"""
     at = open_page(DISEASE_PAGE)
-    at.button[-1].click().run()  # 最後のボタン = 競合製品（モックセプト皮下注）
+    # 関連製品タブの、競合製品（モックセプト皮下注）のボタン。key は「to_product_適応症ID」
+    # （モックセプト皮下注 × 架空慢性疾患A の適応症は、indications.csv の2行目なので ID 2）
+    at.button(key="to_product_2").click().run()
     assert not at.exception
     assert at.title[0].value == "💊 製品情報"
     assert at.header[0].value == "モックセプト皮下注"

@@ -21,9 +21,12 @@ BACKUP_DIR = ROOT / "data" / "backups"
 
 
 def backup_db(db_path=None, backup_dir=None):
-    """データベースの控えを「medknowledge_日時.db」として保存し、その場所を返します。"""
-    # database.DB_PATH と BACKUP_DIR は「呼ばれた時点」の値を使う（テストで場所を差し替えられるようにするため）
-    db_path = Path(db_path or database.DB_PATH)
+    """
+    データベースの控えを「データベースの名前_日時.db」として保存し、その場所を返します。
+    （例：medknowledge_20251020_153000.db、実データなら medknowledge_real_20251020_153000.db）
+    """
+    # 今使うデータベースと BACKUP_DIR は「呼ばれた時点」の値を使う（切り替えやテストで場所が変わるため）
+    db_path = Path(db_path or database.current_db_path())
     backup_dir = Path(backup_dir or BACKUP_DIR)
     if not db_path.exists():
         raise FileNotFoundError(f"データベースが見つかりません：{db_path}")
@@ -31,10 +34,10 @@ def backup_db(db_path=None, backup_dir=None):
 
     # 同じ秒に2回実行しても上書きしないよう、名前が重なったら番号を付ける
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dest = backup_dir / f"medknowledge_{stamp}.db"
+    dest = backup_dir / f"{db_path.stem}_{stamp}.db"
     number = 2
     while dest.exists():
-        dest = backup_dir / f"medknowledge_{stamp}_{number}.db"
+        dest = backup_dir / f"{db_path.stem}_{stamp}_{number}.db"
         number += 1
 
     # SQLite 標準のバックアップ機能を使う（使用中のDBでも安全にコピーできる）
@@ -61,7 +64,7 @@ def restore_db(backup_path, db_path=None, backup_dir=None):
     念のため、復元する前の今のデータベースもバックアップしておきます（その場所を返します）。
     """
     backup_path = Path(backup_path)
-    db_path = Path(db_path or database.DB_PATH)
+    db_path = Path(db_path or database.current_db_path())
     if not backup_path.exists():
         raise FileNotFoundError(f"バックアップが見つかりません：{backup_path}")
     if not check_integrity(backup_path):

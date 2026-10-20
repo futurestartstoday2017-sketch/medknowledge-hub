@@ -10,7 +10,7 @@ CSVで取り込んだ医学的情報（効能・効果の文言・承認・特�
 「原文確認済み」にするのは、更新管理画面で原文を確認してからです。
 
 取り込める種類（KINDS）：
-  企業 / 製品 / 疾患 / 文書と版 / 適応症
+  企業 / 製品 / 疾患 / 文書と版 / 適応症 / 臨床試験
   承認 / 再審査 / 特許 / ライセンス / PMS（この5つは「事実」の種類。出典が必須で、まとめて同じ手順で検証する）
 """
 
@@ -24,6 +24,7 @@ import pandas as pd
 from db.changes import add_record, get_row, log_change, transaction
 from db.database import ROOT
 from services.fact_fields import FIELD_SPECS, check_combination, parse_value
+from services.trials import add_trial_entry
 from services.updates import register_document_version
 
 TEMPLATES_DIR = ROOT / "data" / "templates"
@@ -111,6 +112,47 @@ KINDS = {
         ],
         "example": ["サンプリンβ錠", "架空慢性疾患C", "（架空）架空慢性疾患C", "サンプリンβ錠 添付文書（架空）",
                     "2025年10月作成（第1版）", "4. 効能又は効果"],
+    },
+    # ---- 臨床試験（Step 10 で追加）。1行 = 1つの登録番号 ----
+    "trials": {
+        "label": "臨床試験",
+        "file": "trials.csv",
+        "columns": [
+            ("同じ試験の登録番号", "same_trial_as", False),
+            ("レジストリ", "registry", True),
+            ("登録番号", "registration_no", True),
+            ("登録ページURL", "url", True),
+            ("登録情報の最終更新日", "last_updated", False),
+            ("取得日", "retrieved_on", True),
+            ("他の登録番号", "secondary_ids", False),
+            ("研究タイトル", "title", False),
+            ("対象疾患（登録ページの記載）", "conditions_text", False),
+            ("試験薬・介入（登録ページの記載）", "interventions_text", False),
+            ("研究の種類", "study_type", False),
+            ("研究デザイン", "design", False),
+            ("開発フェーズ", "phase", False),
+            ("スポンサー（企業）", "sponsor_company", False),
+            ("スポンサー（登録ページの記載）", "sponsor_text", False),
+            ("主要評価項目", "primary_endpoint", False),
+            ("研究開始日", "start_date", False),
+            ("研究開始日は実績か予定か", "start_date_type", False),
+            ("研究終了日", "end_date", False),
+            ("研究終了日は実績か予定か", "end_date_type", False),
+            ("募集状況", "recruitment_status", False),
+            ("結果公開状況", "results_status", False),
+            ("試験薬の販売名", "test_products", False),
+            ("対照薬の販売名", "control_products", False),
+            ("対象の疾患名", "diseases", False),
+            ("該当箇所", "source_location", False),
+        ],
+        "defaults": {"study_type": "未確認", "phase": "未確認", "start_date_type": "未確認",
+                     "end_date_type": "未確認", "recruitment_status": "未確認", "results_status": "未確認"},
+        "example": ["", "ClinicalTrials.gov", "NCT-架空-0099", "https://example.com/ctgov/0099", "2025-09-01",
+                    "2025-11-01", "", "（架空）サンプリンα錠の長期投与試験", "（架空）架空慢性疾患A",
+                    "（架空）サンプリン 1日1回 経口投与", "介入研究", "（架空）非盲検・単群", "第3相",
+                    "サンプル製薬（架空）", "サンプル製薬株式会社（架空）", "（架空）52週間の有害事象の発現割合",
+                    "2025-10", "実績", "2027-03", "予定", "募集中", "結果未公開", "サンプリンα錠", "",
+                    "架空慢性疾患A", ""],
     },
     # ---- ここから下は「事実」の種類（Step 9 で追加）----
     "approvals": {
@@ -288,9 +330,85 @@ def validate(conn, kind, table):
         errors.extend(_check_facts(conn, kind, rows))
     else:
         checker = {"companies": _check_companies, "products": _check_products, "diseases": _check_diseases,
-                   "documents": _check_documents, "indications": _check_indications}[kind]
+                   "documents": _check_documents, "indications": _check_indications,
+                   "trials": _check_trials}[kind]
         errors.extend(checker(conn, rows))
     return errors
+
+
+# 試験の「内容」の列（同じ試験の2行目以降では空欄にする列）
+_TRIAL_DETAIL_NAMES = ["title", "conditions_text", "interventions_text", "study_type", "design", "phase",
+                       "sponsor_company", "sponsor_text", "primary_endpoint", "start_date", "start_date_type",
+                       "end_date", "end_date_type", "recruitment_status", "results_status"]
+
+
+def _check_trials(conn, rows):
+    """臨床試験の行（1行 = 1つの登録番号）を検証します。"""
+    errors = []
+    registries = dict((c, o) for c, _, _, o in FIELD_SPECS["trial_registrations"])["registry"]
+    headers = {name: header for header, name, _ in KINDS["trials"]["columns"]}
+    numbers_in_file = []  # この行より上に書かれた登録番号（「同じ試験の登録番号」で参照できる）
+    for row in rows:
+        line = row["_line"]
+        if row["registry"] and row["registry"] not in registries:
+            errors.append(f"{line}行目：「レジストリ」は次のどれかにしてください：{'、'.join(registries)}")
+        errors += _check_url(line, "登録ページURL", row["url"])
+        errors += _check_date(line, "登録情報の最終更新日", row["last_updated"])
+        errors += _check_date(line, "取得日", row["retrieved_on"])
+        if row["registry"] and row["registration_no"] and conn.execute(
+                "SELECT 1 FROM trial_registrations WHERE registry = ? AND registration_no = ? AND is_current = 1",
+                (row["registry"], row["registration_no"])).fetchone():
+            errors.append(f"{line}行目：{row['registry']} の登録番号「{row['registration_no']}」はすでに登録されています。")
+
+        if row["same_trial_as"]:
+            # 同じ試験に登録番号を追加する行：参照先があるか、内容の列が空欄か
+            in_db = conn.execute("SELECT 1 FROM trial_registrations WHERE registration_no = ? AND is_current = 1",
+                                 (row["same_trial_as"],)).fetchone()
+            if not in_db and row["same_trial_as"] not in numbers_in_file:
+                errors.append(f"{line}行目：「同じ試験の登録番号」{row['same_trial_as']} が、登録済みにも"
+                              "この行より上にもありません（先にその試験の行を書いてください）。")
+            filled = [headers[n] for n in _TRIAL_DETAIL_NAMES if row[n]]
+            if filled:
+                errors.append(f"{line}行目：「同じ試験の登録番号」を書いた行では、試験の内容の列は空欄にしてください"
+                              f"（内容は最初の行に書きます）：{'、'.join(filled)}")
+        else:
+            # 新しい試験の行：内容の必須項目と、値の形
+            for name in ("title", "conditions_text", "interventions_text"):
+                if not row[name]:
+                    errors.append(f"{line}行目：新しい試験の行では「{headers[name]}」は必須です。")
+            values = _trial_detail_values(row)
+            for name, (kind_, options) in {c: (k, o) for c, _, k, o in FIELD_SPECS["trial_details"]}.items():
+                if name not in row:
+                    continue
+                if kind_ == "select" and values[name] not in options:
+                    errors.append(f"{line}行目：「{headers[name]}」は次のどれかにしてください：{'、'.join(options)}")
+                elif kind_ == "month_or_date":
+                    try:
+                        parse_value(kind_, headers[name], row[name])
+                    except ValueError as error:
+                        errors.append(f"{line}行目：{error}")
+            if not errors:
+                errors += [f"{line}行目：{m}" for m in check_combination("trial_details", values)]
+            if row["sponsor_company"] and not _company_id(conn, row["sponsor_company"]):
+                errors.append(f"{line}行目：スポンサーの企業「{row['sponsor_company']}」が登録されていません"
+                              "（企業テーブルにない場合は「スポンサー（登録ページの記載）」だけに書いてください）。")
+
+        for name, finder, label in (("test_products", _product_id, "製品"), ("control_products", _product_id, "製品"),
+                                    ("diseases", _disease_id, "疾患")):
+            for value in (row[name] or "").split(";"):
+                if value.strip() and not finder(conn, value.strip()):
+                    errors.append(f"{line}行目：{label}「{value.strip()}」が登録されていません。")
+        if row["registration_no"]:
+            numbers_in_file.append(row["registration_no"])
+
+    errors += _check_duplicates(rows, ["registry", "registration_no"], "レジストリと登録番号")
+    return errors
+
+
+def _trial_detail_values(row):
+    """試験の行の、内容の値（空欄は既定値「未確認」など）を返します。"""
+    defaults = KINDS["trials"]["defaults"]
+    return {name: row[name] if row[name] is not None else defaults.get(name) for name in _TRIAL_DETAIL_NAMES}
 
 
 def _check_companies(conn, rows):
@@ -601,12 +719,20 @@ def _check_url(line, header, value):
 # 3. 登録
 # ---------------------------------------------------------------------
 
-def import_rows(conn, kind, table, reviewer, reason):
+ENTRY_METHODS = ("CSV", "AI抽出")
+
+
+def import_rows(conn, kind, table, reviewer, reason, entry_method="CSV"):
     """
     CSVの内容を登録し、登録した行数を返します。
     登録の直前にもう一度検証し、誤りがあれば何も登録せずに ValueError を出します。
     すべての登録を更新履歴（確認者・理由つき）に残します。
+
+    entry_method：CSVを作ったのが人なら「CSV」、AI（Claude など）なら「AI抽出」。
+    事実（医学的情報・承認・試験など）の「入力方法」として記録します（どちらも「未確認」で登録）。
     """
+    if entry_method not in ENTRY_METHODS:
+        raise ValueError(f"入力方法は {ENTRY_METHODS} のどちらかにしてください")
     errors = validate(conn, kind, table)
     if errors:
         raise ValueError("CSVに誤りがあるため登録しませんでした：" + " / ".join(errors))
@@ -616,7 +742,13 @@ def import_rows(conn, kind, table, reviewer, reason):
             if "fact_table" in KINDS[kind]:
                 # 事実は「未確認」で登録する（原文の確認は更新管理画面で行う）
                 values, _ = _fact_values(conn, kind, row)
+                values["entry_method"] = entry_method
                 add_record(conn, KINDS[kind]["fact_table"], values, reviewer, reason)
+            elif kind == "trials":
+                trial_row = {**row, **_trial_detail_values(row)} if not row["same_trial_as"] else dict(row)
+                add_trial_entry(conn, trial_row, entry_method, reviewer, reason)
+            elif kind == "indications":
+                _import_indications(conn, row, reviewer, reason, entry_method)
             else:
                 importer = {"companies": _import_companies, "products": _import_products,
                             "diseases": _import_diseases, "documents": _import_documents,
@@ -667,7 +799,7 @@ def _import_documents(conn, row, reviewer, reason):
             _insert_logged(conn, "document_links", {"document_id": document_id, column: value}, reviewer, reason)
 
 
-def _import_indications(conn, row, reviewer, reason):
+def _import_indications(conn, row, reviewer, reason, entry_method="CSV"):
     product_id = _product_id(conn, row["brand_name"])
     disease_id = _disease_id(conn, row["disease_name"])
     indication = conn.execute("SELECT id FROM indications WHERE product_id = ? AND disease_id = ?",
@@ -681,7 +813,7 @@ def _import_indications(conn, row, reviewer, reason):
         # 医学的情報は必ず「未確認」で登録する（原文の確認は更新管理画面で行う）
         add_record(conn, "medical_facts", {
             "indication_id": indication_id, "fact_type": "効能・効果", "content": row["content"],
-            "source_version_id": version_id, "source_location": row["source_location"], "entry_method": "CSV",
+            "source_version_id": version_id, "source_location": row["source_location"], "entry_method": entry_method,
         }, reviewer, reason)
 
 

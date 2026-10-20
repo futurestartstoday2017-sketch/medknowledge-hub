@@ -12,10 +12,12 @@ import streamlit as st
 
 from components.display import (
     DISEASE_OVERVIEW_ORDER, DISEASE_TREATMENT_ORDER, STATUS_LEGEND, escape, go_to_product, show_documents,
-    show_fact, show_facts_in_order, show_notes, show_planned,
+    show_fact, show_facts_in_order, show_notes, show_planned, show_trials_with_links,
 )
 from db.database import get_connection
-from db.queries import get_disease, get_disease_facts, get_disease_products, get_documents, get_notes, list_diseases
+from db.queries import (
+    get_disease, get_disease_facts, get_disease_products, get_documents, get_notes, list_diseases, list_trials,
+)
 
 st.title("🩺 疾患情報")
 st.caption(STATUS_LEGEND)
@@ -50,6 +52,7 @@ with closing(get_connection()) as conn:
     products = get_disease_products(conn, selected_id)
     documents = get_documents(conn, disease_id=selected_id)
     notes = get_notes(conn, disease_id=selected_id)
+    disease_trials = [t for t in list_trials(conn) if any(d["disease_id"] == selected_id for d in t["diseases"])]
 
 st.divider()
 st.header(escape(disease["name_ja"]))
@@ -89,7 +92,8 @@ with tabs[2]:
             go_to_product(product["product_id"], key=f"to_product_{product['id']}")
 
 with tabs[3]:
-    show_planned(10, "この疾患の臨床試験の一覧")
+    st.caption("対象企業の製品・競合製品が試験薬・対照薬になっている試験のうち、この疾患に分類したものです。")
+    show_trials_with_links(disease_trials, "disease", empty_message="この疾患の臨床試験は登録されていません。")
 
 with tabs[4]:
     show_planned(12, "この疾患の主要論文の一覧")

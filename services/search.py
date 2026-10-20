@@ -16,11 +16,11 @@ LIMIT = 50
 def search_all(conn, keyword):
     """
     キーワードで横断検索し、次の形の辞書を返します。
-    {"products": [...], "diseases": [...], "documents": [...], "facts": [...], "safety": [...]}
+    {"products": [...], "diseases": [...], "documents": [...], "facts": [...], "safety": [...], "trials": [...]}
     """
     terms = keyword.split()  # 空白（全角・半角）で区切る
     if not terms:
-        return {"products": [], "diseases": [], "documents": [], "facts": [], "safety": []}
+        return {"products": [], "diseases": [], "documents": [], "facts": [], "safety": [], "trials": []}
 
     # ---- 製品（販売名・一般名・製造販売元/販売元の企業名）----
     where, params = _like_all(terms, [
@@ -82,12 +82,24 @@ def search_all(conn, keyword):
         order=f"f.id LIMIT {LIMIT}",
     )
 
+    # ---- 臨床試験（今の内容のタイトル・対象疾患・介入、登録番号）----
+    where, params = _like_all(terms, [
+        "d.title", "d.conditions_text", "d.interventions_text",
+        "(SELECT group_concat(r.registration_no, ' ') FROM trial_registrations r "
+        "  WHERE r.trial_id = d.trial_id AND r.is_current = 1)",
+    ])
+    trials = conn.execute(f"""
+        SELECT d.trial_id, d.title, d.phase, d.status FROM trial_details d
+        WHERE d.is_current = 1 AND {where} ORDER BY d.trial_id LIMIT {LIMIT}
+    """, params).fetchall()
+
     return {
         "products": [dict(r) for r in products],
         "diseases": [dict(r) for r in diseases],
         "documents": [dict(r) for r in documents],
         "facts": facts,
         "safety": safety,
+        "trials": [dict(r) for r in trials],
     }
 
 

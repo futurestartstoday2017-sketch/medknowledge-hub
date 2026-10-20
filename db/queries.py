@@ -40,6 +40,7 @@ def get_home_counts(conn):
 
     return {
         "products": count("SELECT COUNT(*) FROM products"),
+        "trials": count("SELECT COUNT(*) FROM trials"),
         "diseases": count("SELECT COUNT(*) FROM diseases"),
         "documents": count("SELECT COUNT(*) FROM documents"),
         "unverified": unverified,
@@ -304,6 +305,71 @@ def get_product_regulatory(conn, product_id):
               for t in REGULATORY_TABLES}
     result["approvals"].sort(key=lambda a: a["approval_date"])
     return result
+
+
+def trial_code(trial_id):
+    """研究IDを「TR-0001」の形の文字にします。"""
+    return f"TR-{trial_id:04d}"
+
+
+def list_trials(conn, trial_ids=None):
+    """
+    臨床試験を、一覧・詳細で使う辞書のリストで返します（研究IDの順）。
+    1件ごとに次の項目があります。
+      trial_id, code（TR-0001）, detail（今の内容。出典つき。なければ None）,
+      registrations（登録番号のリスト。出典つき）, products（[{product_id, brand_name, category, role}]）,
+      diseases（[{disease_id, name_ja}]）, sponsor_category（対象企業 / 競合 / その他）
+    trial_ids を渡すと、その試験だけにしぼります。
+    """
+    details = {f["trial_id"]: f for f in fetch_facts(
+        conn, "trial_details", "1 = 1", (),
+        extra_columns="sc.name_ja AS sponsor_company, sc.is_target AS sponsor_is_target",
+        extra_join="LEFT JOIN companies sc ON sc.id = f.sponsor_company_id")}
+    registrations = {}
+    for r in fetch_facts(conn, "trial_registrations", "1 = 1", (), order="f.registry, f.registration_no"):
+        registrations.setdefault(r["trial_id"], []).append(r)
+    products = {}
+    for r in conn.execute("""
+            SELECT tp.trial_id, tp.role, p.id AS product_id, p.brand_name, p.category
+            FROM trial_products tp JOIN products p ON p.id = tp.product_id
+            ORDER BY CASE tp.role WHEN '試験薬' THEN 0 WHEN '対照薬' THEN 1 ELSE 2 END, p.brand_name"""):
+        products.setdefault(r["trial_id"], []).append(dict(r))
+    diseases = {}
+    for r in conn.execute("""
+            SELECT td.trial_id, d.id AS disease_id, d.name_ja
+            FROM trial_diseases td JOIN diseases d ON d.id = td.disease_id ORDER BY d.name_ja"""):
+        diseases.setdefault(r["trial_id"], []).append(dict(r))
+
+    result = []
+    for (trial_id,) in conn.execute("SELECT id FROM trials ORDER BY id"):
+        if trial_ids is not None and trial_id not in trial_ids:
+            continue
+        detail = details.get(trial_id)
+        if detail and detail["sponsor_company"]:
+            sponsor_category = "対象企業" if detail["sponsor_is_target"] else "競合"
+        else:
+            sponsor_category = "その他"
+        result.append({
+            "trial_id": trial_id, "code": trial_code(trial_id), "detail": detail,
+            "registrations": registrations.get(trial_id, []), "products": products.get(trial_id, []),
+            "diseases": diseases.get(trial_id, []), "sponsor_category": sponsor_category,
+        })
+    return result
+
+
+def get_trial_pms(conn, registration_numbers):
+    """登録番号が同じ PMS（製造販売後調査等）を、出典つきで返します。"""
+    if not registration_numbers:
+        return []
+    marks = ", ".join("?" * len(registration_numbers))
+    return fetch_facts(conn, "pms_studies", f"f.registration_no IN ({marks})", list(registration_numbers),
+                       **FACT_SUBJECTS["pms_studies"])
+
+
+def trial_codes_by_registration(conn):
+    """登録番号 → 研究ID（TR-0001）の対応を返します（PMS の表に「対応する臨床試験」を出すため）。"""
+    return {r["registration_no"]: trial_code(r["trial_id"]) for r in conn.execute(
+        "SELECT registration_no, trial_id FROM trial_registrations WHERE is_current = 1")}
 
 
 def list_review_facts(conn, statuses):
