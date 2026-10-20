@@ -121,6 +121,18 @@ def test_new_version_of_existing_document(loaded):
                          "WHERE v.is_current = 0 AND f.is_current = 1 AND f.status = '原文確認済み'") == 0
 
 
+def test_document_linked_to_several_products(loaded):
+    """「関連する販売名」を「;」で区切ると、1つの文書を複数の製品にひも付けられることを確認します。"""
+    import_all(loaded)
+    csv = ("文書種別,文書タイトル,発行元,識別番号,版,改訂年月,入手日,原文URL,最新版,関連する販売名,関連する疾患名\n"
+           "有価証券報告書・IR資料,サンプル製薬 有価証券報告書（架空）,,,第1期,2025-06,2025-11-01,"
+           "https://example.com/ir1,はい,サンプリンα錠; サンプリンβ錠,\n")
+    assert validate(loaded, "documents", table(csv)) == []
+    import_rows(loaded, "documents", table(csv), "山田", "複数製品の文書")
+    assert count(loaded, "SELECT COUNT(*) FROM document_links l JOIN documents d ON d.id = l.document_id "
+                         "WHERE d.title = 'サンプル製薬 有価証券報告書（架空）'") == 2
+
+
 def test_blank_lines_are_ignored(loaded):
     """空の行は無視されることを確認します。"""
     assert validate(loaded, "diseases", table(DISEASES_CSV + ",\n\n")) == []
@@ -143,6 +155,10 @@ def test_blank_lines_are_ignored(loaded):
     ("documents",
      "文書種別,文書タイトル,発行元,識別番号,版,改訂年月,入手日,原文URL,最新版,関連する販売名,関連する疾患名\n"
      "添付文書,新文書,,,第1版,2025-10,2025-11-01,https://example.com/x,はい,存在しない錠,\n", "登録されていません"),
+    ("documents",
+     "文書種別,文書タイトル,発行元,識別番号,版,改訂年月,入手日,原文URL,最新版,関連する販売名,関連する疾患名\n"
+     "添付文書,新文書,,,第1版,2025-10,2025-11-01,https://example.com/x,はい,サンプリンα錠;存在しない錠,\n",
+     "「存在しない錠」が登録されていません"),
     ("documents",
      "文書種別,文書タイトル,発行元,識別番号,版,改訂年月,入手日,原文URL,最新版,関連する販売名,関連する疾患名\n"
      "添付文書,新文書,,,第1版,2025-10,2025-11-01,https://example.com/x,はい,,\n", "どちらかを入力"),

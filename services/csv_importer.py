@@ -619,13 +619,15 @@ def _check_documents(conn, rows):
             errors.append(f"{line}行目：「最新版」は「はい」か「いいえ」にしてください（空欄は「はい」）。")
         is_current = row["is_current"] != "いいえ"
 
-        # 関連する製品・疾患（どちらか1つ以上必要。登録済みのものだけ指定できる）
-        if not row["brand_name"] and not row["disease_name"]:
+        # 関連する製品・疾患（どちらか1つ以上必要。登録済みのものだけ指定できる。「;」区切りで複数指定できる）
+        if not _names(row["brand_name"]) and not _names(row["disease_name"]):
             errors.append(f"{line}行目：「関連する販売名」か「関連する疾患名」のどちらかを入力してください。")
-        if row["brand_name"] and not _product_id(conn, row["brand_name"]):
-            errors.append(f"{line}行目：関連する販売名「{row['brand_name']}」が登録されていません（先に製品を取り込んでください）。")
-        if row["disease_name"] and not _disease_id(conn, row["disease_name"]):
-            errors.append(f"{line}行目：関連する疾患名「{row['disease_name']}」が登録されていません（先に疾患を取り込んでください）。")
+        for name in _names(row["brand_name"]):
+            if not _product_id(conn, name):
+                errors.append(f"{line}行目：関連する販売名「{name}」が登録されていません（先に製品を取り込んでください）。")
+        for name in _names(row["disease_name"]):
+            if not _disease_id(conn, name):
+                errors.append(f"{line}行目：関連する疾患名「{name}」が登録されていません（先に疾患を取り込んでください）。")
 
         if not (row["doc_type"] and row["title"]):
             continue
@@ -828,9 +830,10 @@ def _import_documents(conn, row, reviewer, reason):
     # 版の登録は、更新管理画面と同じ処理を使う（最新版の切り替え・再確認要への変更・履歴の記録をまとめて行う）
     register_document_version(conn, document_id, row["version_label"], row["revised_on"], row["retrieved_on"],
                               row["source_url"], row["is_current"] != "いいえ", reviewer, reason)
-    # 文書と製品・疾患のひも付け（まだなければ追加する）
-    for column, value in (("product_id", _product_id(conn, row["brand_name"]) if row["brand_name"] else None),
-                          ("disease_id", _disease_id(conn, row["disease_name"]) if row["disease_name"] else None)):
+    # 文書と製品・疾患のひも付け（まだなければ追加する。「;」区切りの複数指定にも対応）
+    links = [("product_id", _product_id(conn, name)) for name in _names(row["brand_name"])]
+    links += [("disease_id", _disease_id(conn, name)) for name in _names(row["disease_name"])]
+    for column, value in links:
         if value and not conn.execute(f"SELECT 1 FROM document_links WHERE document_id = ? AND {column} = ?",
                                       (document_id, value)).fetchone():
             _insert_logged(conn, "document_links", {"document_id": document_id, column: value}, reviewer, reason)
@@ -875,6 +878,11 @@ def write_templates():
     TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     for kind, spec in KINDS.items():
         (TEMPLATES_DIR / spec["file"]).write_bytes(template_bytes(kind))
+
+
+def _names(text):
+    """「;」区切りの名前のリストにします（前後の空白と空の項目は除く）。"""
+    return [part.strip() for part in (text or "").split(";") if part.strip()]
 
 
 def _product_id(conn, brand_name):
