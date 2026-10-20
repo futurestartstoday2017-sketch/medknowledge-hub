@@ -68,6 +68,23 @@ COLUMN_LABELS = {
     "progress": "実施状況",
     "target_cases": "目標症例数",
     "registration_no": "登録番号",
+    # ---- 臨床試験（Step 10 で追加）----
+    "trial_id": "研究ID",
+    "conditions_text": "対象疾患（登録ページの記載）",
+    "interventions_text": "試験薬・介入（登録ページの記載）",
+    "study_type": "研究の種類",
+    "design": "研究デザイン",
+    "phase": "開発フェーズ",
+    "sponsor_company_id": "スポンサー（企業）",
+    "sponsor_text": "スポンサー（登録ページの記載）",
+    "primary_endpoint": "主要評価項目",
+    "start_date_type": "開始日は実績か予定か",
+    "end_date_type": "終了日は実績か予定か",
+    "recruitment_status": "募集状況",
+    "results_status": "結果公開状況",
+    "registry": "レジストリ",
+    "secondary_ids": "他の登録番号",
+    "last_checked_on": "最終確認日",
     # ---- 製品・疾患・文書など（CSVインポートの履歴で使う）----
     "brand_name": "販売名",
     "generic_name": "一般名",
@@ -125,6 +142,7 @@ def display_value(conn, column, value):
             "disease_id": "SELECT name_ja FROM diseases WHERE id = ?",
             "company_id": "SELECT name_ja FROM companies WHERE id = ?",
             "partner_company_id": "SELECT name_ja FROM companies WHERE id = ?",
+            "sponsor_company_id": "SELECT name_ja FROM companies WHERE id = ?",
             "indication_id": "SELECT p.brand_name || ' × ' || d.name_ja FROM indications i "
                              "JOIN products p ON p.id = i.product_id JOIN diseases d ON d.id = i.disease_id "
                              "WHERE i.id = ?",

@@ -16,7 +16,7 @@ DB_PATH = ROOT / "data" / "medknowledge.db"
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 # 設計図のバージョン番号。テーブルの形を変えたら数字を上げ、MIGRATIONS に追加分のSQLを登録する
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # マイグレーション（古いDBを新しい設計図の形にするための追加分のSQL）の場所と一覧
 #   バージョン1 = schema.sql（最初の設計図）
@@ -24,6 +24,7 @@ SCHEMA_VERSION = 2
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 MIGRATIONS = {
     2: "002_regulatory_pms.sql",  # 承認・再審査・特許・ライセンス・PMS
+    3: "003_trials.sql",          # 臨床試験
 }
 
 # 【出典セット】を持つ「事実」のテーブルと、あとから書き換えてはいけない列の一覧
@@ -65,6 +66,17 @@ FACT_TABLES = {
         "target_cases", "disclosure", "start_date", "end_date", "registration_no",
         "source_version_id", "source_location", "entry_method",
     ],
+    # ---- ここから下は設計図バージョン3（db/migrations/003_trials.sql）で追加 ----
+    "trial_details": [
+        "trial_id", "title", "conditions_text", "interventions_text", "study_type", "design", "phase",
+        "sponsor_company_id", "sponsor_text", "primary_endpoint",
+        "start_date", "start_date_type", "end_date", "end_date_type", "recruitment_status", "results_status",
+        "source_version_id", "source_location", "entry_method",
+    ],
+    "trial_registrations": [
+        "trial_id", "registry", "registration_no", "secondary_ids", "last_checked_on",
+        "source_version_id", "source_location", "entry_method",
+    ],
 }
 
 
@@ -88,6 +100,11 @@ TABLE_LABELS = {
     "patents": "特許",
     "licenses": "ライセンス",
     "pms_studies": "PMS（製造販売後調査等）",
+    "trials": "臨床試験",
+    "trial_details": "臨床試験の内容",
+    "trial_registrations": "試験の登録番号",
+    "trial_products": "試験と製品の対応",
+    "trial_diseases": "試験と疾患の対応",
 }
 
 

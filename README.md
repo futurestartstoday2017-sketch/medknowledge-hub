@@ -140,7 +140,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 - [x] Step 7：確認・更新管理画面
 - [x] Step 8：CSVインポート
 - [x] Step 9：承認・再審査・特許・ライセンス・PMS（タイムライン・比較表・CSVを含む）
-- [ ] Step 10〜11：臨床試験（ClinicalTrials.gov 取得は利用条件の確認後）
+- [ ] Step 10〜11：臨床試験（10-1 テーブル・架空データまで完了）
 - [ ] Step 12〜13：論文（PubMed 取得は利用条件の確認後）
 - [ ] Step 14〜15：メディカル活動・疾患別MA学習ビュー
 - [ ] Step 16：実製品の登録

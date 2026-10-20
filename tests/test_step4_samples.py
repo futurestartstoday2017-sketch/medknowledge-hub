@@ -114,6 +114,7 @@ def test_home_shows_counts_from_database():
     values = {m.label: m.value for m in at.metric}
     assert values["登録製品数"] == "3"
     assert values["登録疾患数"] == "2"
-    assert values["登録文書数"] == "11"  # 添付文書・IF・ガイドライン6件 + RMP3件・決算説明資料2件（Step 9 で追加）
+    # 添付文書・IF・ガイドライン6件 + RMP3件・決算説明資料2件（Step 9）+ 臨床試験の登録ページ5件（Step 10）
+    assert values["登録文書数"] == "16"
     assert int(values["更新確認待ち"]) > 0
     assert any("架空データ" in w.value for w in at.warning)

@@ -66,7 +66,7 @@ def insert(conn, table, values):
 
 def test_new_database_is_latest_version(conn):
     """新しく作ったDBが最新の設計図のバージョンで、新しいテーブルがそろっていることを確認します。"""
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION >= 2
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert set(NEW_TABLES) <= tables
 
@@ -87,10 +87,10 @@ def test_migration_from_version_1_keeps_data(tmp_path, monkeypatch):
     conn.close()
 
     # ② 最新のアプリで開く → マイグレーションが実行される
-    monkeypatch.setattr(db.database, "SCHEMA_VERSION", 2)
+    monkeypatch.setattr(db.database, "SCHEMA_VERSION", SCHEMA_VERSION)
     init_db(path)
     conn = get_connection(path)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     assert conn.execute("SELECT brand_name FROM products").fetchone()[0] == "旧データ錠"
     for table in NEW_TABLES:  # 新しいテーブルにも、削除禁止のトリガーが作られている
         assert conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND name = ?",

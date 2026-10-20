@@ -16,6 +16,7 @@ import pandas as pd
 
 from db.changes import add_record, set_status, transaction
 from db.database import ROOT
+from services.trials import add_trial_entry
 
 SAMPLES_DIR = ROOT / "data" / "samples"
 
@@ -130,6 +131,16 @@ def load_sample_data(conn, samples_dir=None):
                 **{k: row[k] for k in ("role", "license_type", "territory", "content", "disclosure",
                                        "contract_start", "contract_end", "disclosed_fiscal_year")},
             })
+        # ---- 臨床試験（設計図バージョン3で追加）。1行 = 1つの登録番号 ----
+        for row in _read(folder, "trials.csv"):
+            ids = add_trial_entry(conn, row, "CSV", CHANGED_BY, REASON)
+            status = row["status"] or "未確認"
+            if status != "未確認":
+                for table, record_id in (("trial_details", ids["detail_id"]),
+                                         ("trial_registrations", ids["registration_id"])):
+                    if record_id:
+                        set_status(conn, table, record_id, status, CHANGED_BY, "架空サンプルデータの確認状態を設定")
+
         for row in _read(folder, "pms_studies.csv"):
             _add_fact(conn, "pms_studies", row, {
                 "product_id": _product_id(conn, row["brand_name"]),

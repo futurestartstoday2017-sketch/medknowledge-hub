@@ -278,6 +278,17 @@ FACT_SUBJECTS = {
             LEFT JOIN diseases idis ON idis.id = si.disease_id
         """,
     ),
+    # ---- 臨床試験（Step 10）。対象は「研究ID（TR-0001 の形）」----
+    "trial_details": dict(
+        extra_columns="'TR-' || printf('%04d', f.trial_id) AS subject, '試験の内容（' || f.phase || '）' AS item, "
+                      "f.title AS content",
+        extra_join="",
+    ),
+    "trial_registrations": dict(
+        extra_columns="'TR-' || printf('%04d', f.trial_id) AS subject, '登録番号（' || f.registry || '）' AS item, "
+                      "f.registration_no AS content",
+        extra_join="",
+    ),
 }
 
 

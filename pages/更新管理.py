@@ -165,7 +165,8 @@ with tabs[0]:
                 elif kind == "textarea":
                     raw_values[column] = st.text_area(label, value=current or "", key=widget_key)
                 else:  # text / date / int は1行の入力欄（日付は YYYY-MM-DD、空欄にすると「なし」）
-                    hint = "（YYYY-MM-DD。空欄可）" if kind == "date" else ""
+                    hint = {"date": "（YYYY-MM-DD。空欄可）",
+                            "month_or_date": "（YYYY-MM-DD か YYYY-MM。空欄可）"}.get(kind, "")
                     raw_values[column] = st.text_input(label + hint, value="" if current is None else str(current),
                                                        key=widget_key)
 

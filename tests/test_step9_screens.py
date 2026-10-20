@@ -125,8 +125,9 @@ def test_field_specs_cover_all_fact_tables():
 
 def test_field_spec_options_match_database_rules():
     """選択肢の値が、データベースのルール（CHECK）に書かれている値と一致していることを確認します。"""
-    sql = (ROOT / "db" / "schema.sql").read_text(encoding="utf-8") + \
-        (ROOT / "db" / "migrations" / "002_regulatory_pms.sql").read_text(encoding="utf-8")
+    # 最初の設計図と、すべてのマイグレーション（追加分）を読む
+    sql = (ROOT / "db" / "schema.sql").read_text(encoding="utf-8") + "".join(
+        f.read_text(encoding="utf-8") for f in sorted((ROOT / "db" / "migrations").glob("*.sql")))
     for table, fields in FIELD_SPECS.items():
         for column, _, kind, options in fields:
             if kind == "select":
