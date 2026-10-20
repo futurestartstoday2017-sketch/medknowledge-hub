@@ -77,6 +77,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 | `db/quality.py` | 出典と版の不整合を見つける品質チェック |
 | `db/backup.py` | バックアップと復元 |
 | `db/queries.py` | 画面に表示するデータを取り出す処理 |
+| `components/display.py` | 画面で共通して使う表示の部品（確認状態の印・出典の表示など） |
 | `services/sample_loader.py` | 架空データのCSVをデータベースに登録する処理 |
 | `services/` | CSVインポートなど、画面から使う処理 |
 | `data/templates/` | CSVテンプレート（見出し行のみ） |
@@ -98,7 +99,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 - [x] Step 2：Streamlitの起動とホーム画面
 - [x] Step 3：テーブル作成・品質を守る仕組み・バックアップと復元
 - [x] Step 4：架空データの登録
-- [ ] Step 5：製品・疾患画面
+- [x] Step 5：製品・疾患画面
 - [ ] Step 6：横断検索・競合製品比較
 - [ ] Step 7：確認・更新管理画面
 - [ ] Step 8：CSVインポート
