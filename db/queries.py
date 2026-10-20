@@ -281,6 +281,20 @@ FACT_SUBJECTS = {
 }
 
 
+REGULATORY_TABLES = ["approvals", "reexaminations", "patents", "licenses", "pms_studies"]
+
+
+def get_product_regulatory(conn, product_id):
+    """
+    製品の承認・再審査・特許・ライセンス・PMS を、出典付きで返します。
+    {"approvals": [...], "reexaminations": [...], ...} の形で、承認は承認年月日の順に並べます。
+    """
+    result = {t: fetch_facts(conn, t, "f.product_id = ?", (product_id,), **FACT_SUBJECTS[t])
+              for t in REGULATORY_TABLES}
+    result["approvals"].sort(key=lambda a: a["approval_date"])
+    return result
+
+
 def list_review_facts(conn, statuses):
     """
     指定した確認状態の「今の情報」を、すべての事実のテーブルから集めて返します。

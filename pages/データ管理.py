@@ -17,6 +17,7 @@ import streamlit as st
 
 from db.backup import BACKUP_DIR, backup_db
 from db.database import get_connection
+from db.errors import friendly_db_error
 from db.settings import get_setting, set_setting
 from services.csv_importer import KINDS, example_table, import_rows, read_csv, template_bytes, validate
 
@@ -94,7 +95,7 @@ with tabs[0]:
                                 count = import_rows(conn, kind, table, reviewer.strip(), reason.strip())
                                 set_setting(conn, "last_reviewer", reviewer.strip())
                         except (sqlite3.IntegrityError, ValueError) as error:
-                            st.error(f"登録できませんでした（データは変更されていません）：{error}")
+                            st.error(f"登録できませんでした（データは変更されていません）：{friendly_db_error(error)}")
                         else:
                             st.session_state["flash"] = (
                                 f"{spec['label']}を {count} 行登録しました（登録前のバックアップ：{backup_path.name}）。"

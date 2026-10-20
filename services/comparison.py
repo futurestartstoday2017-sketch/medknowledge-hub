@@ -11,11 +11,16 @@ comparison.py：競合製品比較のための表を作る処理です。
 
 import pandas as pd
 
-from components.display import STATUS_ICONS, status_label
-from db.queries import get_disease_products, get_product_companies, get_product_facts
+from components.display import STATUS_ICONS, disclosed_value, status_label
+from db.queries import get_disease_products, get_product_companies, get_product_facts, get_product_regulatory
+from services.timeline import effective_expiry, first_approval, latest_patent, product_reexam
 
 # 比較表に並べる項目（この順で上から表示する）
-COMPARISON_ITEMS = ["効能・効果", "製造販売元", "販売元", "薬効分類", "作用機序", "投与経路", "剤形", "用法・用量"]
+COMPARISON_ITEMS = [
+    "効能・効果", "製造販売元", "販売元", "薬効分類", "作用機序", "投与経路", "剤形", "用法・用量",
+    # ---- 承認・再審査・特許・PMS（Step 9 で追加）----
+    "初回承認年月日", "再審査期間の終了日", "特許満了日（最も遅いもの）", "全例調査",
+]
 
 
 def build_comparison(conn, disease_id, product_ids=None):
@@ -35,6 +40,7 @@ def build_comparison(conn, disease_id, product_ids=None):
         for fact in get_product_facts(conn, entry["product_id"]):
             if fact["fact_type"] in items:
                 items[fact["fact_type"]].append(fact)
+        items.update(_regulatory_items(get_product_regulatory(conn, entry["product_id"])))
         product = {k: entry[k] for k in ("product_id", "brand_name", "generic_name", "category")}
         entries.append({"product": product, "items": items})
     return entries
@@ -77,6 +83,36 @@ def sources_table(entries, verified_only=False):
                 })
     return pd.DataFrame(rows, columns=["製品", "項目", "確認状態", "内容", "出典文書", "版", "改訂年月",
                                        "該当箇所", "確認日", "原文URL"])
+
+
+def _regulatory_items(regulatory):
+    """
+    承認・再審査・特許・PMS から、比較表の4つの行に出す値を作ります。
+    事実の辞書をコピーし、表に出す文字を content に入れ直して返します（出典・確認状態はそのまま）。
+    """
+    def shown(fact, text):
+        return {**fact, "content": text}
+
+    items = {}
+    approval = first_approval(regulatory["approvals"])
+    items["初回承認年月日"] = [shown(approval, approval["approval_date"])] if approval else []
+
+    reexam = product_reexam(regulatory["reexaminations"])
+    items["再審査期間の終了日"] = (
+        [shown(reexam, disclosed_value(reexam["disclosure"], reexam["end_date"]))] if reexam else [])
+
+    patent = latest_patent(regulatory["patents"])
+    if patent:
+        extended = "（延長登録後）" if patent["extended_expiry_date"] else ""
+        items["特許満了日（最も遅いもの）"] = [shown(patent, f"{effective_expiry(patent)}{extended}")]
+    else:
+        # 公開の満了日がない場合は、特許ごとの公開状況（🔒 非公開 / ❔ 未確認）を出す
+        items["特許満了日（最も遅いもの）"] = [shown(p, disclosed_value(p["disclosure"], None))
+                                       for p in regulatory["patents"]]
+
+    # 全例調査：PMS ごとに「全例調査か」と調査名を出す（登録がなければ「未登録」）
+    items["全例調査"] = [shown(p, f"{p['all_case']}（{p['title']}）") for p in regulatory["pms_studies"]]
+    return items
 
 
 def _visible(facts, verified_only):

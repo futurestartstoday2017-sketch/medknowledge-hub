@@ -22,6 +22,7 @@ from components.display import STATUS_LEGEND, show_fact, status_label
 from db.backup import backup_db
 from db.changes import set_status
 from db.database import TABLE_LABELS, get_connection
+from db.errors import friendly_db_error
 from db.quality import find_quality_problems
 from db.queries import (
     get_change_log_entry, get_fact_detail, get_version_choices, list_all_documents, list_all_versions,
@@ -29,6 +30,7 @@ from db.queries import (
 )
 from db.settings import get_setting, set_setting
 from services.diff import diff_records, parse_json
+from services.fact_fields import FIELD_SPECS, check_combination, parse_value
 from services.updates import (
     CANDIDATE_STATUSES, add_candidate, confirm_document_version, register_document_version,
     revise_fact, update_candidate_status,
@@ -76,7 +78,7 @@ def run_update(update, message, reason):
             set_setting(conn, "last_reviewer", reviewer)
     except (sqlite3.IntegrityError, ValueError) as error:
         # DBのルール違反など。何も変更されていない（トランザクションで取り消されている）
-        st.error(f"反映できませんでした（データは変更されていません）：{error}")
+        st.error(f"反映できませんでした（データは変更されていません）：{friendly_db_error(error)}")
         return
     st.session_state["flash"] = message(result)
     st.rerun()  # 画面を最新の状態で表示し直す
@@ -146,47 +148,61 @@ with tabs[0]:
                     )
 
         # ---- 内容を修正する（差分を確認してから反映）----
-        if table not in ("medical_facts", "safety_info", "product_companies"):
-            # 承認・特許などの修正フォームは Step 9-2 で作る（確認状態の変更は今も使える）
-            right.info(f"{fact['table_label']}の内容を修正するフォームは、Step 9-2 で作ります。")
-        else:
-            with right, st.form("revise_form"):
-                st.markdown("**内容を修正する**（古い情報は削除せず、履歴として残ります）")
-                changes = {}
-                if table == "product_companies":
-                    company_ids = [c[0] for c in companies]
-                    company_names = dict(companies)
-                    new_company = st.selectbox("企業", company_ids, index=company_ids.index(fact["company_id"]),
-                                               format_func=lambda i: company_names[i], key=f"revise_company_{key}")
-                    if new_company != fact["company_id"]:
-                        changes["company_id"] = new_company
+        # 修正できる項目は services/fact_fields.py の FIELD_SPECS で決めてあり、それに合わせて入力欄を並べる
+        with right, st.form("revise_form"):
+            st.markdown("**内容を修正する**（古い情報は削除せず、履歴として残ります）")
+            company_ids = [c[0] for c in companies]
+            company_names = dict(companies)
+            raw_values = {}  # 入力欄の値（まだ文字のまま）
+            for column, label, kind, options in FIELD_SPECS[table]:
+                widget_key = f"revise_{column}_{key}"
+                current = fact[column]
+                if kind == "company":
+                    raw_values[column] = st.selectbox(label, company_ids, index=company_ids.index(current),
+                                                      format_func=lambda i: company_names[i], key=widget_key)
+                elif kind == "select":
+                    raw_values[column] = st.selectbox(label, options, index=options.index(current), key=widget_key)
+                elif kind == "textarea":
+                    raw_values[column] = st.text_area(label, value=current or "", key=widget_key)
+                else:  # text / date / int は1行の入力欄（日付は YYYY-MM-DD、空欄にすると「なし」）
+                    hint = "（YYYY-MM-DD。空欄可）" if kind == "date" else ""
+                    raw_values[column] = st.text_input(label + hint, value="" if current is None else str(current),
+                                                       key=widget_key)
+
+            version_ids = [v[0] for v in version_choices]
+            version_names = dict(version_choices)
+            raw_values["source_version_id"] = st.selectbox(
+                "出典の版", version_ids, index=version_ids.index(fact["source_version_id"]),
+                format_func=lambda i: version_names[i], key=f"revise_version_{key}")
+            raw_values["source_location"] = st.text_input("該当箇所", value=fact["source_location"],
+                                                          key=f"revise_location_{key}")
+
+            revise_reason = st.text_input("修正の理由（必須）", placeholder="例：添付文書の改訂に合わせて修正",
+                                          key=f"revise_reason_{key}")
+            mark_verified = st.checkbox("原文を確認したので、修正後の情報を「原文確認済み」にする",
+                                        key=f"revise_verified_{key}")
+            if st.form_submit_button("変更内容を確認する", key="revise_preview"):
+                # 入力欄の文字を、データベースに入れる値に直す（日付の形などをここで確かめる）
+                kinds = {column: kind for column, _, kind, _ in FIELD_SPECS[table]}
+                kinds.update({"source_version_id": "select", "source_location": "text"})
+                labels = {column: label for column, label, _, _ in FIELD_SPECS[table]}
+                labels.update({"source_version_id": "出典の版", "source_location": "該当箇所"})
+                try:
+                    values = {c: parse_value(kinds[c], labels[c], raw) for c, raw in raw_values.items()}
+                    problems = check_combination(table, {**fact, **values})
+                except ValueError as error:
+                    problems = [str(error)]
+                changes = {c: v for c, v in values.items() if v != fact[c]} if not problems else {}
+                if problems:
+                    for problem in problems:
+                        st.error(problem)
+                elif not changes:
+                    st.warning("変更された項目がありません。")
                 else:
-                    new_content = st.text_area("内容", value=fact["content"], key=f"revise_content_{key}")
-                    if new_content.strip() != fact["content"]:
-                        changes["content"] = new_content.strip()
-
-                version_ids = [v[0] for v in version_choices]
-                version_names = dict(version_choices)
-                new_version = st.selectbox("出典の版", version_ids, index=version_ids.index(fact["source_version_id"]),
-                                           format_func=lambda i: version_names[i], key=f"revise_version_{key}")
-                if new_version != fact["source_version_id"]:
-                    changes["source_version_id"] = new_version
-                new_location = st.text_input("該当箇所", value=fact["source_location"], key=f"revise_location_{key}")
-                if new_location.strip() != fact["source_location"]:
-                    changes["source_location"] = new_location.strip()
-
-                revise_reason = st.text_input("修正の理由（必須）", placeholder="例：添付文書の改訂に合わせて修正",
-                                              key=f"revise_reason_{key}")
-                mark_verified = st.checkbox("原文を確認したので、修正後の情報を「原文確認済み」にする",
-                                            key=f"revise_verified_{key}")
-                if st.form_submit_button("変更内容を確認する", key="revise_preview"):
-                    if not changes:
-                        st.warning("変更された項目がありません。")
-                    else:
-                        # すぐには反映せず、差分を見てもらうために一時的に覚えておく
-                        st.session_state["pending_revision"] = {
-                            "key": key, "changes": changes, "reason": revise_reason, "verified": mark_verified,
-                        }
+                    # すぐには反映せず、差分を見てもらうために一時的に覚えておく
+                    st.session_state["pending_revision"] = {
+                        "key": key, "changes": changes, "reason": revise_reason, "verified": mark_verified,
+                    }
 
         # ---- 差分の確認と反映 ----
         pending = st.session_state.get("pending_revision")

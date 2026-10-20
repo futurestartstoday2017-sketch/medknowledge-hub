@@ -2,7 +2,8 @@
 製品情報.py：② 製品情報画面です。
 
 上に製品一覧、下に選んだ製品の詳細をタブで表示します。
-医学的情報・安全性情報は、すべて確認状態と出典（文書名・版・該当箇所・確認日）付きで表示します。
+医学的情報・安全性情報・承認・特許などは、すべて確認状態と出典（文書名・版・該当箇所・確認日）付きで表示します。
+「承認・再審査・PMS」タブの最初に、承認から特許満了までのタイムラインを表示します。
 """
 
 from contextlib import closing
@@ -10,14 +11,15 @@ from contextlib import closing
 import streamlit as st
 
 from components.display import (
-    PRODUCT_FACT_ORDER, SAFETY_ORDER, STATUS_LEGEND, escape, go_to_disease, show_documents, show_fact,
-    show_facts_in_order, show_notes, show_planned,
+    DISCLOSURE_LEGEND, PRODUCT_FACT_ORDER, SAFETY_ORDER, STATUS_LEGEND, disclosed_value, escape, go_to_disease,
+    show_documents, show_fact, show_facts_in_order, show_facts_table, show_notes, show_timeline,
 )
 from db.database import get_connection
 from db.queries import (
     get_documents, get_notes, get_product, get_product_companies, get_product_facts,
-    get_product_indications, get_safety_info, list_products,
+    get_product_indications, get_product_regulatory, get_safety_info, list_products,
 )
+from services.timeline import build_timeline
 
 st.title("💊 製品情報")
 st.caption(STATUS_LEGEND)
@@ -57,6 +59,8 @@ with closing(get_connection()) as conn:
     safety = get_safety_info(conn, selected_id)
     documents = get_documents(conn, product_id=selected_id)
     notes = get_notes(conn, product_id=selected_id)
+    regulatory = get_product_regulatory(conn, selected_id)
+    timeline = build_timeline(conn, selected_id)
 
 st.divider()
 st.header(escape(product["brand_name"]))
@@ -71,7 +75,7 @@ col3.markdown(
 )
 col4.markdown(f"**最終確認日**  \n{product['last_checked_on'] or '未確認'}")
 
-tabs = st.tabs(["基本情報", "適応症", "安全性情報", "承認・再審査", "ライセンス・特許", "文書", "学習メモ"])
+tabs = st.tabs(["基本情報", "適応症", "安全性情報", "承認・再審査・PMS", "ライセンス・特許", "文書", "学習メモ"])
 
 with tabs[0]:
     st.subheader("製造販売元・販売元")
@@ -96,10 +100,62 @@ with tabs[2]:
     show_facts_in_order(safety, "category", SAFETY_ORDER, "安全性情報は登録されていません。")
 
 with tabs[3]:
-    show_planned(9, "承認情報（承認年月日）・再審査期間の表示")
+    show_timeline(timeline)
+
+    st.subheader("承認の履歴")
+    show_facts_table(regulatory["approvals"], [
+        ("承認年月日", lambda f: f["approval_date"]),
+        ("承認の種類", lambda f: f["approval_type"]),
+        ("対象", lambda f: f["subject"]),
+        ("承認内容", lambda f: f["content"]),
+        ("承認番号", lambda f: f["approval_number"] or "—"),
+    ], "承認情報は登録されていません。")
+
+    st.subheader("再審査期間")
+    st.caption(DISCLOSURE_LEGEND)
+    show_facts_table(regulatory["reexaminations"], [
+        ("対象", lambda f: f["subject"]),
+        ("説明", lambda f: f["content"]),
+        ("再審査期間（年）", lambda f: disclosed_value(f["disclosure"], f["period_years"])),
+        ("再審査期間の開始日", lambda f: disclosed_value(f["disclosure"], f["start_date"])),
+        ("再審査期間の終了日", lambda f: disclosed_value(f["disclosure"], f["end_date"])),
+    ], "再審査期間は登録されていません。")
+
+    st.subheader("PMS（製造販売後調査等）")
+    show_facts_table(regulatory["pms_studies"], [
+        ("種類", lambda f: f["study_type"]),
+        ("調査名", lambda f: f["title"]),
+        ("全例調査か", lambda f: f["all_case"]),
+        ("承認条件か", lambda f: f["approval_condition"]),
+        ("実施状況", lambda f: f["progress"]),
+        ("目標症例数", lambda f: f["target_cases"] or "—"),
+        ("実施期間", lambda f: disclosed_value(
+            f["disclosure"], f"{f['start_date'] or '?'} 〜 {f['end_date'] or '（終了日なし）'}")),
+        ("登録番号", lambda f: f["registration_no"] or "—"),
+    ], "PMSは登録されていません。")
 
 with tabs[4]:
-    show_planned(9, "導入元・提携先、ライセンス契約、特許情報の表示")
+    st.caption(DISCLOSURE_LEGEND)
+    st.subheader("導入元・提携先（ライセンス）")
+    show_facts_table(regulatory["licenses"], [
+        ("相手先", lambda f: f["item"]),
+        ("契約の種類", lambda f: f["license_type"]),
+        ("対象地域", lambda f: f["territory"] or "—"),
+        ("契約内容", lambda f: f["content"]),
+        ("契約開始日", lambda f: disclosed_value(f["disclosure"], f["contract_start"])),
+        ("契約終了日", lambda f: disclosed_value(f["disclosure"], f["contract_end"])),
+        ("開示年度", lambda f: f["disclosed_fiscal_year"] or "—"),
+    ], "ライセンス情報は登録されていません。")
+
+    st.subheader("特許")
+    show_facts_table(regulatory["patents"], [
+        ("特許番号", lambda f: f["patent_number"]),
+        ("国・地域", lambda f: f["country"]),
+        ("種類", lambda f: f["patent_kind"]),
+        ("発明の名称", lambda f: f["title"] or "—"),
+        ("特許の存続期間満了日", lambda f: disclosed_value(f["disclosure"], f["expiry_date"])),
+        ("延長登録後の満了日", lambda f: disclosed_value(f["disclosure"], f["extended_expiry_date"])),
+    ], "特許は登録されていません。")
 
 with tabs[5]:
     show_documents(documents)

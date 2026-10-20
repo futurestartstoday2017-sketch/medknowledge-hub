@@ -1,10 +1,12 @@
 """
 display.py：複数の画面で共通して使う「表示の部品」をまとめたファイルです。
 
-事実（医学的情報など）は、必ずこのファイルの show_fact() で表示します。
+事実（医学的情報など）は、必ずこのファイルの show_fact()（1件ずつの枠）か
+show_facts_table()（表）で表示します。
 内容と一緒に、確認状態の印と出典（文書名・版・該当箇所・確認日）が必ず表示されるようにするためです。
 """
 
+import pandas as pd
 import streamlit as st
 
 # 確認状態の印
@@ -102,6 +104,86 @@ def show_notes(notes):
         with st.container(border=True):
             st.markdown(f"📝 **{note['note_type']}**　（更新：{note['updated_at'][:10]}）")
             st.markdown(escape(note["body"]))
+
+
+# 公開状況（disclosure）の説明。確認状態の「⚠️ 未確認」と区別するため、別の印と説明を付ける
+DISCLOSURE_LEGEND = ("🔒 非公開（公表されていない）／ ❔ 未確認（公開情報で確認できていない）"
+                     "　※確認状態の「⚠️ 未確認（原文と未照合）」とは別の意味です")
+
+
+def disclosed_value(disclosure, value):
+    """
+    公開状況に合わせて、日付などの値を表示用の文字にします。
+    公開 → 値（空なら「—」）／ 非公開 → 🔒 非公開 ／ 未確認 → ❔ 未確認
+    """
+    if disclosure == "非公開":
+        return "🔒 非公開"
+    if disclosure == "未確認":
+        return "❔ 未確認"
+    return value if value not in (None, "") else "—"
+
+
+def facts_table(facts, columns):
+    """
+    事実のリストを、表（DataFrame）にします。
+    columns：[(列の見出し, 1件の事実から値を作る関数), ...]
+    どの表にも、最後に「確認状態・出典・版・該当箇所・確認日・原文URL」の列を必ず付けます。
+    """
+    rows = []
+    for fact in facts:
+        row = {header: make(fact) for header, make in columns}
+        row.update({
+            "確認状態": status_label(fact["status"]),
+            "出典": fact["doc_title"] + ("（過去の版）" if not fact["version_is_current"] else ""),
+            "版": fact["version_label"],
+            "該当箇所": fact["source_location"],
+            "確認日": fact["verified_at"][:10] if fact["status"] == "原文確認済み" and fact["verified_at"] else "未確認",
+            "原文URL": fact["source_url"],
+        })
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def show_facts_table(facts, columns, empty_message):
+    """facts_table() で作った表を表示します。原文URLは押すと開けるリンクにします。"""
+    if not facts:
+        st.info(empty_message)
+        return
+    st.dataframe(
+        facts_table(facts, columns),
+        hide_index=True,
+        column_config={"原文URL": st.column_config.LinkColumn("原文URL", display_text="原文を開く")},
+    )
+
+
+def show_timeline(timeline):
+    """
+    承認から特許満了までのタイムライン（services/timeline.py の build_timeline() の結果）を表示します。
+    3つの日付を数字の枠（メトリック）で、期間を表で示します。
+    """
+    st.subheader("⏱️ 承認から特許満了までのタイムライン")
+    st.caption("エビデンス創出の計画を考えるための目安です。"
+               "**後発品の参入時期を予測するものではありません**（実際は再審査・特許の種類・承認審査などで決まります）。")
+
+    columns = st.columns(len(timeline["milestones"]))
+    for column, milestone in zip(columns, timeline["milestones"]):
+        column.metric(milestone["label"], milestone["date"] or "—")
+        fact = milestone["fact"]
+        if fact and milestone["date"]:
+            column.caption(f"{status_label(fact['status'])}　出典：{escape(fact['doc_title'])}")
+        elif fact:
+            column.caption(disclosed_value(fact.get("disclosure"), None) if fact.get("disclosure") else "日付なし")
+        else:
+            column.caption("未登録")
+
+    for note in timeline["notes"]:
+        st.warning(note)
+    if timeline["durations"]:
+        st.table(pd.DataFrame(timeline["durations"]).set_index("区間"))
+    if len(timeline["patents"]) > 1:
+        st.caption("比べた特許の満了日（延長登録後があればその日）："
+                   + "、".join(f"{p['patent_number']}＝{p['extended_expiry_date'] or p['expiry_date']}"
+                              for p in timeline["patents"]))
 
 
 def go_to_product(product_id, key, label="この製品の情報を見る"):

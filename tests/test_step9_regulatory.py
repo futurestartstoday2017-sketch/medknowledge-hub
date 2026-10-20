@@ -292,10 +292,10 @@ def test_sample_regulatory_data_is_fictional(loaded):
             assert all("架空" in v for v in values), f"{table}.{column}"
 
 
-# ---- 更新管理画面（9-1 では確認状態の変更だけ使える） ----
+# ---- 更新管理画面 ----
 
 def test_update_page_lists_new_tables():
-    """更新管理の確認待ち一覧に、新しいテーブルの情報も出てきて、選んでもエラーにならないことを確認します。"""
+    """更新管理の確認待ち一覧に新しいテーブルの情報も出て、選ぶとその項目の修正欄が並ぶことを確認します。"""
     at = AppTest.from_file(APP, default_timeout=30).run()
     at.switch_page("pages/更新管理.py").run()
     kinds = set(at.dataframe[0].value["種類"])
@@ -303,7 +303,8 @@ def test_update_page_lists_new_tables():
     patent_key = next(o for o in at.selectbox(key="review_target").options if "特許" in o)
     at.selectbox(key="review_target").select(patent_key).run()
     assert not at.exception
-    assert any("Step 9-2" in i.value for i in at.info)
+    labels = [t.label for t in at.text_input]
+    assert any("特許の存続期間満了日" in label for label in labels), labels
 
 
 def test_status_change_works_for_new_tables(loaded):

@@ -95,6 +95,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 | `db/changes.py` | 事実のデータを、更新履歴を残しながら登録・変更する処理 |
 | `db/quality.py` | 出典と版の不整合を見つける品質チェック |
 | `db/backup.py` | バックアップと復元 |
+| `db/errors.py` | データベースのエラーを日本語の説明に直す処理 |
 | `db/settings.py` | アプリの設定（前回の確認者名など）の保存 |
 | `db/queries.py` | 画面に表示するデータを取り出す処理 |
 | `components/display.py` | 画面で共通して使う表示の部品（確認状態の印・出典の表示など） |
@@ -102,6 +103,8 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 | `services/comparison.py` | 競合製品比較の表と、出典の一覧を作る処理 |
 | `services/updates.py` | 確認・更新管理の処理（内容の修正、新しい版の登録、変更候補） |
 | `services/diff.py` | 変更前と変更後の差分を作る処理 |
+| `services/timeline.py` | 初回承認から再審査期間の終了・特許満了までのタイムライン（期間の目安） |
+| `services/fact_fields.py` | 事実のテーブルごとの「修正できる項目」の定義と、入力値の確認 |
 | `services/csv_importer.py` | CSVの検証と取り込み |
 | `services/sample_loader.py` | 架空データのCSVをデータベースに登録する処理 |
 | `services/` | CSVインポートなど、画面から使う処理 |
@@ -128,7 +131,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 - [x] Step 6：横断検索・競合製品比較
 - [x] Step 7：確認・更新管理画面
 - [x] Step 8：CSVインポート
-- [ ] Step 9：承認・再審査・特許・ライセンス・PMS（9-1 テーブル作成まで完了）
+- [ ] Step 9：承認・再審査・特許・ライセンス・PMS（9-1 テーブル・9-2 画面とタイムラインまで完了）
 - [ ] Step 10〜11：臨床試験（ClinicalTrials.gov 取得は利用条件の確認後）
 - [ ] Step 12〜13：論文（PubMed 取得は利用条件の確認後）
 - [ ] Step 14〜15：メディカル活動・疾患別MA学習ビュー
