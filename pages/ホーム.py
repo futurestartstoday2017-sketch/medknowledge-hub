@@ -102,7 +102,7 @@ st.divider()
 
 # ---- 各画面への入口 ----
 st.subheader("メニュー")
-nav1, nav2, nav3, nav4 = st.columns(4)
+nav1, nav2, nav3, nav4, nav5 = st.columns(5)
 # st.page_link：押すとその画面に移動するリンク
 nav1.page_link("pages/製品情報.py", label="製品情報", icon="💊")
 nav1.caption("製品の一覧・詳細、適応症、安全性情報")
@@ -112,3 +112,5 @@ nav3.page_link("pages/競合製品比較.py", label="競合製品比較", icon="
 nav3.caption("同じ適応症の製品を出典つきで比較")
 nav4.page_link("pages/更新管理.py", label="更新管理", icon="🔄")
 nav4.caption("原文の確認、内容の修正、文書の改訂、更新履歴")
+nav5.page_link("pages/データ管理.py", label="データ管理", icon="🗂️")
+nav5.caption("CSVインポート、バックアップ")

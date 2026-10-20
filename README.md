@@ -49,6 +49,23 @@ pytest
 初めて `streamlit run app.py` を実行すると、`data/medknowledge.db` が自動で作られ、`data/samples/` の架空データ（製品3件・疾患2件など）が登録されます。
 架空データの状態に戻したいときは、アプリを止めてから `data/medknowledge.db` を削除し、もう一度起動してください（削除する前にバックアップを取っておくと安心です）。
 
+## CSVでデータを取り込む
+
+サイドバーの「データ管理」→「CSVインポート」から取り込めます。テンプレートは `data/templates/` にあり、画面からもダウンロードできます。
+
+| テンプレート | 内容 |
+|---|---|
+| `products.csv` | 製品（販売名・一般名・区分・公式製品URL・最終確認日） |
+| `diseases.csv` | 疾患（疾患名・英語名） |
+| `documents.csv` | 文書と版（文書種別・タイトル・版・改訂年月・入手日・原文URL・関連する製品/疾患 など） |
+| `indications.csv` | 適応症（販売名・疾患名と、効能・効果の文言・出典） |
+
+- 取り込む順番は「製品・疾患 → 文書と版 → 適応症」です（先に登録したものを、あとのCSVで参照するため）。
+- Excel で編集して「CSV（コンマ区切り）」または「CSV UTF-8」で保存したファイルを読み込めます。
+- 誤りが1か所でもあれば何も登録せず、何行目のどこが誤りかを日本語で表示します。
+- 取り込んだ医学的情報（効能・効果の文言）は「⚠️ 未確認」で登録されます。原文を確認したら「更新管理」画面で「原文確認済み」にしてください。
+- 登録の前に、自動でバックアップを取ります。
+
 ## バックアップと復元
 
 ```powershell
@@ -71,7 +88,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 | 場所 | 役割 |
 |---|---|
 | `app.py` | 起動ファイル（共通設定とサイドバーのメニュー定義） |
-| `pages/` | ①〜⑤ の各画面（ホーム・製品情報・疾患情報・競合製品比較・更新管理） |
+| `pages/` | 各画面（ホーム・製品情報・疾患情報・競合製品比較・更新管理・データ管理） |
 | `db/schema.sql` | データベースの設計図（テーブルの定義） |
 | `db/database.py` | データベースへの接続・テーブル作成 |
 | `db/changes.py` | 事実のデータを、更新履歴を残しながら登録・変更する処理 |
@@ -84,9 +101,10 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 | `services/comparison.py` | 競合製品比較の表と、出典の一覧を作る処理 |
 | `services/updates.py` | 確認・更新管理の処理（内容の修正、新しい版の登録、変更候補） |
 | `services/diff.py` | 変更前と変更後の差分を作る処理 |
+| `services/csv_importer.py` | CSVの検証と取り込み |
 | `services/sample_loader.py` | 架空データのCSVをデータベースに登録する処理 |
 | `services/` | CSVインポートなど、画面から使う処理 |
-| `data/templates/` | CSVテンプレート（見出し行のみ） |
+| `data/templates/` | CSVインポート用のテンプレート（見出し行のみ） |
 | `data/samples/` | 動作確認用の架空データ（CSV。初回起動時に自動で登録） |
 | `data/medknowledge.db` | データベース本体（自動作成・Gitには含めない） |
 | `data/backups/` | データベースのバックアップ（Gitには含めない） |
@@ -108,7 +126,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 - [x] Step 5：製品・疾患画面
 - [x] Step 6：横断検索・競合製品比較
 - [x] Step 7：確認・更新管理画面
-- [ ] Step 8：CSVインポート
+- [x] Step 8：CSVインポート
 - [ ] Step 9：承認・再審査・特許・ライセンス
 - [ ] Step 10〜11：臨床試験（ClinicalTrials.gov 取得は利用条件の確認後）
 - [ ] Step 12〜13：論文（PubMed 取得は利用条件の確認後）

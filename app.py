@@ -42,6 +42,7 @@ PAGES = [
     st.Page("pages/疾患情報.py", title="疾患情報", icon="🩺", url_path="diseases"),
     st.Page("pages/競合製品比較.py", title="競合製品比較", icon="📊", url_path="compare"),
     st.Page("pages/更新管理.py", title="更新管理", icon="🔄", url_path="updates"),
+    st.Page("pages/データ管理.py", title="データ管理", icon="🗂️", url_path="data"),
 ]
 
 # メニューを作り、選ばれた画面を表示する
