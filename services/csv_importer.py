@@ -154,6 +154,38 @@ KINDS = {
                     "2025-10", "実績", "2027-03", "予定", "募集中", "結果未公開", "サンプリンα錠", "",
                     "架空慢性疾患A", ""],
     },
+    # ---- 製品の事実（実データの準備で追加）----
+    "product_companies": {
+        "label": "製造販売元・販売元",
+        "file": "product_companies.csv",
+        "fact_table": "product_companies",
+        "columns": [
+            ("販売名", "brand_name", True),
+            ("企業名", "company", True),
+            ("役割", "role", True),
+            *SOURCE_COLUMNS,
+        ],
+        "extra_fields": [("role", "役割", "select", ["製造販売元", "販売元"])],
+        "unique": ["product_id", "company_id", "role"],
+        "example": ["サンプリンα錠", "モデル薬品（架空）", "販売元", "サンプル製薬 決算説明資料（架空）",
+                    "2024年度 決算説明資料", "（架空）p.20"],
+    },
+    "product_facts": {
+        "label": "製品の医学的情報",
+        "file": "product_facts.csv",
+        "fact_table": "medical_facts",
+        "columns": [
+            ("販売名", "brand_name", True),
+            ("情報の種類", "fact_type", True),
+            ("内容", "content", True),
+            *SOURCE_COLUMNS,
+        ],
+        "extra_fields": [("fact_type", "情報の種類", "select",
+                          ["薬効分類", "作用機序", "投与経路", "剤形", "用法・用量", "その他"])],
+        "unique": ["product_id", "fact_type", "content"],
+        "example": ["サンプリンα錠", "その他", "（架空）製品についての情報", "サンプル製薬 決算説明資料（架空）",
+                    "2024年度 決算説明資料", "（架空）p.14"],
+    },
     # ---- ここから下は「事実」の種類（Step 9 で追加）----
     "approvals": {
         "label": "承認",
@@ -497,15 +529,20 @@ def _fact_values(conn, kind, row):
             elif indication:
                 values["indication_id"] = indication[0]
 
-    if "partner_company" in row and row["partner_company"]:
-        company_id = _company_id(conn, row["partner_company"])
-        if not company_id:
-            errors.append(f"{line}行目：相手先の企業「{row['partner_company']}」が登録されていません"
-                          "（先に「企業」を取り込んでください）。")
-        values["partner_company_id"] = company_id
+    # 企業名を企業IDに直す（ライセンスの相手先、製造販売元・販売元の企業）
+    for name_column, id_column, label in (("partner_company", "partner_company_id", "相手先の企業"),
+                                          ("company", "company_id", "企業")):
+        if name_column in row and row[name_column]:
+            company_id = _company_id(conn, row[name_column])
+            if not company_id:
+                errors.append(f"{line}行目：{label}「{row[name_column]}」が登録されていません"
+                              "（先に「企業」を取り込んでください）。")
+            values[id_column] = company_id
 
     # ---- 選択肢・日付・整数の確認（更新管理の修正フォームと同じ定義を使う）----
-    fields = {column: (kind_, options) for column, _, kind_, options in FIELD_SPECS[table]}
+    # extra_fields：修正フォームでは変えない（置き換えのときにそのまま引き継ぐ）が、CSVでは入力する項目
+    fields = {column: (kind_, options) for column, _, kind_, options
+              in FIELD_SPECS[table] + spec.get("extra_fields", [])}
     for header, name, _ in spec["columns"]:
         if name not in fields or fields[name][0] == "company":
             continue

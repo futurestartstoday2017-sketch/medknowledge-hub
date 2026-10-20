@@ -39,8 +39,8 @@ st.caption(f"使用中のデータ：{MODES[get_mode()]}（{current_db_path().na
 # 1. CSVインポート
 # =====================================================================
 with tabs[0]:
-    st.caption("取り込む順番：① 企業・製品・疾患 → ② 文書と版 → ③ 適応症・臨床試験 → "
-               "④ 承認・再審査・特許・ライセンス・PMS（先に登録したものを、あとのCSVで参照するため）")
+    st.caption("取り込む順番：① 企業・製品・疾患 → ② 文書と版 → ③ 製造販売元・販売元、製品の医学的情報、"
+               "適応症、臨床試験 → ④ 承認・再審査・特許・ライセンス・PMS（先に登録したものを、あとのCSVで参照するため）")
 
     kind = st.radio("取り込む種類", list(KINDS), format_func=lambda k: KINDS[k]["label"], horizontal=True,
                     key="import_kind")
