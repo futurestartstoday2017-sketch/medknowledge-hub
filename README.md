@@ -44,17 +44,39 @@ pytest
 
 アプリを止めるときは、ターミナルで `Ctrl + C` を押します。
 
+## バックアップと復元
+
+```powershell
+# バックアップを作る（data/backups/ に「medknowledge_日時.db」として保存）
+python -m db.backup backup
+
+# バックアップの一覧を表示する
+python -m db.backup list
+
+# バックアップから復元する（先にアプリを Ctrl + C で止めてください）
+python -m db.backup restore data\backups\medknowledge_20251020_153000.db
+```
+
+復元するときは、壊れていないかを自動でチェックします。また、復元前のデータベースも念のためバックアップとして残します。
+データベースとバックアップは、GitHubにはアップロードされません。
+
 ## フォルダ構成
 
 | 場所 | 役割 |
 |---|---|
 | `app.py` | 起動ファイル（共通設定とサイドバーのメニュー定義） |
 | `pages/` | ①〜⑤ の各画面（ホーム・製品情報・疾患情報・競合製品比較・更新管理） |
-| `db/` | データベースの設計図・接続・データ取得の処理 |
+| `db/schema.sql` | データベースの設計図（テーブルの定義） |
+| `db/database.py` | データベースへの接続・テーブル作成 |
+| `db/changes.py` | 事実のデータを、更新履歴を残しながら登録・変更する処理 |
+| `db/quality.py` | 出典と版の不整合を見つける品質チェック |
+| `db/backup.py` | バックアップと復元 |
 | `services/` | CSVインポートなど、画面から使う処理 |
 | `data/templates/` | CSVテンプレート（見出し行のみ） |
 | `data/samples/` | 学習用の架空データ（CSV） |
 | `data/medknowledge.db` | データベース本体（自動作成・Gitには含めない） |
+| `data/backups/` | データベースのバックアップ（Gitには含めない） |
+| `docs/design.md` | 設計書（テーブル・画面・開発計画） |
 | `tests/` | 自動テスト |
 | `.streamlit/config.toml` | 画面のテーマ（色）の設定 |
 | `requirements.txt` | 必要なライブラリの一覧 |
@@ -63,11 +85,18 @@ pytest
 
 ## 開発状況
 
+詳しい計画は [docs/design.md](docs/design.md) を参照してください。
+
 - [x] Step 1：フォルダ構成と仮想環境の作成
 - [x] Step 2：Streamlitの起動とホーム画面
-- [ ] Step 3：SQLiteのテーブル作成
+- [x] Step 3：テーブル作成・品質を守る仕組み・バックアップと復元
 - [ ] Step 4：架空データの登録
-- [ ] Step 5：製品・疾患一覧と詳細画面
-- [ ] Step 6：検索・競合比較機能
-- [ ] Step 7：CSVインポート機能
-- [ ] Step 8：文書・更新履歴管理
+- [ ] Step 5：製品・疾患画面
+- [ ] Step 6：横断検索・競合製品比較
+- [ ] Step 7：確認・更新管理画面
+- [ ] Step 8：CSVインポート
+- [ ] Step 9：承認・再審査・特許・ライセンス
+- [ ] Step 10〜11：臨床試験（ClinicalTrials.gov 取得は利用条件の確認後）
+- [ ] Step 12〜13：論文（PubMed 取得は利用条件の確認後）
+- [ ] Step 14〜15：メディカル活動・疾患別MA学習ビュー
+- [ ] Step 16：実製品の登録

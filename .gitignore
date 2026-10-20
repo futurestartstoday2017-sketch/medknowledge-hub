@@ -20,3 +20,6 @@ secrets.toml
 *.db
 *.sqlite
 *.sqlite3
+
+# データベースのバックアップ（*.db でも除外されますが、フォルダごと明示しておく）
+data/backups/
