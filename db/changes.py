@@ -8,9 +8,11 @@ changes.py：【出典セット】を持つ「事実」のデータを、更新�
 - add_record()       ：新しく登録する
 - supersede_record() ：内容を変える（古い行は残し、新しい行で置き換える）
 - set_status()       ：確認状態（未確認 / 原文確認済み / 再確認要）を変える
+- transaction()      ：複数の処理を1つのトランザクションにまとめる
 """
 
 import json
+from contextlib import contextmanager
 from datetime import datetime
 
 from db.database import FACT_TABLES
@@ -21,10 +23,31 @@ STATUSES = ("未確認", "原文確認済み", "再確認要")
 _NOT_COPIED = ("id", "status", "verified_by", "verified_at", "is_current", "superseded_by", "created_at")
 
 
+@contextmanager
+def transaction(conn):
+    """
+    with transaction(conn): の中の処理を、1つのトランザクションにまとめます。
+    中でエラーが起きたら、それまでの処理をすべて取り消します。
+
+    すでに外側でトランザクションが始まっている場合は、新しく始めずにその一部として動きます。
+    （例：架空データをまとめて登録するとき、途中で失敗したら全部を取り消せる）
+    """
+    if conn.in_transaction:
+        yield
+        return
+    conn.execute("BEGIN")
+    try:
+        yield
+    except BaseException:
+        conn.rollback()
+        raise
+    conn.commit()
+
+
 def add_record(conn, table, values, changed_by, reason):
     """事実のデータを1件登録し、更新履歴に「追加」を記録します。登録した行のIDを返します。"""
     _check_table(conn, table, values)
-    with conn:  # with の中でエラーが起きたら、すべて取り消される
+    with transaction(conn):  # with の中でエラーが起きたら、すべて取り消される
         new_id = _insert(conn, table, values)
         _log(conn, table, new_id, "追加", None, _get(conn, table, new_id), changed_by, reason)
     return new_id
@@ -37,7 +60,7 @@ def supersede_record(conn, table, old_id, changes, changed_by, reason):
     新しい行のIDを返します。
     """
     _check_table(conn, table, changes)
-    with conn:
+    with transaction(conn):
         old = _get(conn, table, old_id)
         if old is None:
             raise ValueError(f"{table} に ID {old_id} のデータがありません")
@@ -66,7 +89,7 @@ def set_status(conn, table, record_id, status, changed_by, reason):
     _check_table(conn, table)
     if status not in STATUSES:
         raise ValueError(f"確認状態は {STATUSES} のどれかにしてください")
-    with conn:
+    with transaction(conn):
         before = _get(conn, table, record_id)
         if before is None:
             raise ValueError(f"{table} に ID {record_id} のデータがありません")

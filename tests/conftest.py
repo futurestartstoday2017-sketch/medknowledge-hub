@@ -7,8 +7,23 @@ conftest.py：テストで共通して使う準備（フィクスチャ）をま
 """
 
 import pytest
+import streamlit as st
 
+import db.database
 from db.database import get_connection, init_db
+
+
+@pytest.fixture(autouse=True)
+def isolated_app_db(tmp_path, monkeypatch):
+    """
+    すべてのテストで自動的に使われる準備です（autouse=True）。
+    アプリ（app.py）を動かすテストが、本物の data/medknowledge.db を作ったり変えたりしないよう、
+    データベースの場所を使い捨ての場所に差し替えます。
+    """
+    monkeypatch.setattr(db.database, "DB_PATH", tmp_path / "app.db")
+    st.cache_resource.clear()  # 「最初の1回だけ」のDB準備を、テストごとにやり直させる
+    yield
+    st.cache_resource.clear()
 
 
 @pytest.fixture

@@ -1,0 +1,8 @@
+document_title,version_label,revised_on,retrieved_on,confirmed_on,source_url,is_current,status
+サンプリンα錠 添付文書（架空）,2024年4月作成（第1版）,2024-04,2024-05-01,2024-05-01,https://example.com/sampurin/pi/v1,0,原文確認済み
+サンプリンα錠 添付文書（架空）,2025年4月改訂（第2版）,2025-04,2025-05-10,2025-05-10,https://example.com/sampurin/pi/v2,1,原文確認済み
+サンプリンα錠 インタビューフォーム（架空）,2025年4月改訂（第2版）,2025-04,2025-05-10,2025-05-10,https://example.com/sampurin/if/v2,1,原文確認済み
+テスタミドOD錠 添付文書（架空）,2025年1月作成（第1版）,2025-01,2025-06-01,,https://example.com/testamid/pi/v1,1,未確認
+モックセプト皮下注 添付文書（架空）,2024年10月改訂（第3版）,2024-10,2025-06-15,2025-06-15,https://example.com/mockcept/pi/v3,1,原文確認済み
+架空慢性疾患A 診療ガイドライン（架空）,2023年版,2023-03,2025-06-20,2025-06-20,https://example.com/guideline-a/2023,1,原文確認済み
+架空慢性疾患B 診療ガイドライン（架空）,2024年版,2024-09,2025-06-20,,https://example.com/guideline-b/2024,1,未確認

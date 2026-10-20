@@ -44,6 +44,11 @@ pytest
 
 アプリを止めるときは、ターミナルで `Ctrl + C` を押します。
 
+## データベースについて
+
+初めて `streamlit run app.py` を実行すると、`data/medknowledge.db` が自動で作られ、`data/samples/` の架空データ（製品3件・疾患2件など）が登録されます。
+架空データの状態に戻したいときは、アプリを止めてから `data/medknowledge.db` を削除し、もう一度起動してください（削除する前にバックアップを取っておくと安心です）。
+
 ## バックアップと復元
 
 ```powershell
@@ -71,9 +76,11 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 | `db/changes.py` | 事実のデータを、更新履歴を残しながら登録・変更する処理 |
 | `db/quality.py` | 出典と版の不整合を見つける品質チェック |
 | `db/backup.py` | バックアップと復元 |
+| `db/queries.py` | 画面に表示するデータを取り出す処理 |
+| `services/sample_loader.py` | 架空データのCSVをデータベースに登録する処理 |
 | `services/` | CSVインポートなど、画面から使う処理 |
 | `data/templates/` | CSVテンプレート（見出し行のみ） |
-| `data/samples/` | 学習用の架空データ（CSV） |
+| `data/samples/` | 動作確認用の架空データ（CSV。初回起動時に自動で登録） |
 | `data/medknowledge.db` | データベース本体（自動作成・Gitには含めない） |
 | `data/backups/` | データベースのバックアップ（Gitには含めない） |
 | `docs/design.md` | 設計書（テーブル・画面・開発計画） |
@@ -90,7 +97,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 - [x] Step 1：フォルダ構成と仮想環境の作成
 - [x] Step 2：Streamlitの起動とホーム画面
 - [x] Step 3：テーブル作成・品質を守る仕組み・バックアップと復元
-- [ ] Step 4：架空データの登録
+- [x] Step 4：架空データの登録
 - [ ] Step 5：製品・疾患画面
 - [ ] Step 6：横断検索・競合製品比較
 - [ ] Step 7：確認・更新管理画面
