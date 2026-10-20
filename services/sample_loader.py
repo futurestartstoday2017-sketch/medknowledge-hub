@@ -103,6 +103,41 @@ def load_sample_data(conn, samples_dir=None):
                 "content": row["content"],
             })
 
+        # ---- 事実：承認・再審査・特許・ライセンス・PMS（設計図バージョン2で追加）----
+        for row in _read(folder, "approvals.csv"):
+            _add_fact(conn, "approvals", row, {
+                "product_id": _product_id(conn, row["brand_name"]),
+                "indication_id": _optional_indication_id(conn, row),
+                **{k: row[k] for k in ("approval_type", "approval_date", "approval_number", "content")},
+            })
+        for row in _read(folder, "reexaminations.csv"):
+            _add_fact(conn, "reexaminations", row, {
+                "product_id": _product_id(conn, row["brand_name"]),
+                "indication_id": _optional_indication_id(conn, row),
+                "period_years": int(row["period_years"]) if row["period_years"] else None,
+                **{k: row[k] for k in ("content", "disclosure", "start_date", "end_date")},
+            })
+        for row in _read(folder, "patents.csv"):
+            _add_fact(conn, "patents", row, {
+                "product_id": _product_id(conn, row["brand_name"]),
+                **{k: row[k] for k in ("patent_number", "country", "patent_kind", "title", "disclosure",
+                                       "expiry_date", "extended_expiry_date")},
+            })
+        for row in _read(folder, "licenses.csv"):
+            _add_fact(conn, "licenses", row, {
+                "product_id": _product_id(conn, row["brand_name"]),
+                "partner_company_id": _company_id(conn, row["partner_company"]),
+                **{k: row[k] for k in ("role", "license_type", "territory", "content", "disclosure",
+                                       "contract_start", "contract_end", "disclosed_fiscal_year")},
+            })
+        for row in _read(folder, "pms_studies.csv"):
+            _add_fact(conn, "pms_studies", row, {
+                "product_id": _product_id(conn, row["brand_name"]),
+                "indication_id": _optional_indication_id(conn, row),
+                **{k: row[k] for k in ("study_type", "title", "all_case", "approval_condition", "progress",
+                                       "target_cases", "disclosure", "start_date", "end_date", "registration_no")},
+            })
+
 
 # ---- ここから下は、このファイルの中だけで使う補助関数 ----
 
@@ -148,6 +183,16 @@ def _fact_subject(conn, row):
             raise ValueError(f"適応症が見つかりません：{row['brand_name']} × {row['disease_name']}")
         return {"indication_id": indication[0]}
     raise ValueError(f"target_type は 製品 / 疾患 / 適応症 のどれかにしてください：{target_type}")
+
+
+def _optional_indication_id(conn, row):
+    """disease_name 列が空なら None、入っていれば「販売名 × 疾患名」の適応症のIDを返します。"""
+    if not row["disease_name"]:
+        return None
+    return _find_id(
+        conn, "SELECT id FROM indications WHERE product_id = ? AND disease_id = ?",
+        (_product_id(conn, row["brand_name"]), _disease_id(conn, row["disease_name"])), "適応症",
+    )
 
 
 def _find_id(conn, sql, params, label):

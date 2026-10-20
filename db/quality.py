@@ -11,11 +11,10 @@ from db.database import FACT_TABLES, TABLE_LABELS
 
 # 「出典の文書が、その情報の対象（製品・疾患）とつながっているか」を確かめるSQLの条件
 # f は事実のテーブル、v は出典の版を表します
+# ここに書いていないテーブル（安全性情報・承認・特許など、対象が製品のもの）は _PRODUCT_LINKED で確かめます
+_PRODUCT_LINKED = ("EXISTS (SELECT 1 FROM document_links l "
+                   "WHERE l.document_id = v.document_id AND l.product_id = f.product_id)")
 _SOURCE_LINKED = {
-    "product_companies": "EXISTS (SELECT 1 FROM document_links l "
-                         "WHERE l.document_id = v.document_id AND l.product_id = f.product_id)",
-    "safety_info": "EXISTS (SELECT 1 FROM document_links l "
-                   "WHERE l.document_id = v.document_id AND l.product_id = f.product_id)",
     # 医学的情報は、対象が製品・疾患・適応症のどれかなので、それぞれの場合を確かめる
     "medical_facts": """(
         (f.product_id IS NOT NULL AND EXISTS (SELECT 1 FROM document_links l
@@ -44,7 +43,7 @@ def find_quality_problems(conn):
         rows = conn.execute(f"""
             SELECT f.id FROM {table} f
             JOIN document_versions v ON v.id = f.source_version_id
-            WHERE f.is_current = 1 AND NOT {_SOURCE_LINKED[table]}
+            WHERE f.is_current = 1 AND NOT {_SOURCE_LINKED.get(table, _PRODUCT_LINKED)}
         """)
         for row in rows:
             problems.append({

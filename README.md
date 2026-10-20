@@ -89,7 +89,8 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 |---|---|
 | `app.py` | 起動ファイル（共通設定とサイドバーのメニュー定義） |
 | `pages/` | 各画面（ホーム・製品情報・疾患情報・競合製品比較・更新管理・データ管理） |
-| `db/schema.sql` | データベースの設計図（テーブルの定義） |
+| `db/schema.sql` | データベースの設計図（バージョン1のテーブルの定義） |
+| `db/migrations/` | 設計図の追加分（バージョン2以降。古いDBは起動時に自動で更新） |
 | `db/database.py` | データベースへの接続・テーブル作成 |
 | `db/changes.py` | 事実のデータを、更新履歴を残しながら登録・変更する処理 |
 | `db/quality.py` | 出典と版の不整合を見つける品質チェック |
@@ -127,7 +128,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 - [x] Step 6：横断検索・競合製品比較
 - [x] Step 7：確認・更新管理画面
 - [x] Step 8：CSVインポート
-- [ ] Step 9：承認・再審査・特許・ライセンス
+- [ ] Step 9：承認・再審査・特許・ライセンス・PMS（9-1 テーブル作成まで完了）
 - [ ] Step 10〜11：臨床試験（ClinicalTrials.gov 取得は利用条件の確認後）
 - [ ] Step 12〜13：論文（PubMed 取得は利用条件の確認後）
 - [ ] Step 14〜15：メディカル活動・疾患別MA学習ビュー

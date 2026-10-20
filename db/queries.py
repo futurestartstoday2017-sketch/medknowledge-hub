@@ -236,6 +236,48 @@ FACT_SUBJECTS = {
         extra_columns="sp.brand_name AS subject, f.role AS item, c.name_ja AS content",
         extra_join="JOIN products sp ON sp.id = f.product_id JOIN companies c ON c.id = f.company_id",
     ),
+    # ---- 承認・再審査・特許・ライセンス・PMS（対象は製品。適応症が指定されていれば疾患名も付ける）----
+    "approvals": dict(
+        extra_columns="""
+            sp.brand_name || coalesce(' × ' || idis.name_ja, '') AS subject,
+            '承認（' || f.approval_type || '）' AS item
+        """,
+        extra_join="""
+            JOIN products sp ON sp.id = f.product_id
+            LEFT JOIN indications si ON si.id = f.indication_id
+            LEFT JOIN diseases idis ON idis.id = si.disease_id
+        """,
+    ),
+    "reexaminations": dict(
+        extra_columns="sp.brand_name || coalesce(' × ' || idis.name_ja, '') AS subject, '再審査期間' AS item",
+        extra_join="""
+            JOIN products sp ON sp.id = f.product_id
+            LEFT JOIN indications si ON si.id = f.indication_id
+            LEFT JOIN diseases idis ON idis.id = si.disease_id
+        """,
+    ),
+    "patents": dict(
+        extra_columns="""
+            sp.brand_name AS subject, '特許（' || f.patent_kind || '）' AS item,
+            f.patent_number || '（' || f.country || '）' || coalesce(' ' || f.title, '') AS content
+        """,
+        extra_join="JOIN products sp ON sp.id = f.product_id",
+    ),
+    "licenses": dict(
+        extra_columns="sp.brand_name AS subject, f.role || '：' || pc.name_ja AS item",
+        extra_join="JOIN products sp ON sp.id = f.product_id JOIN companies pc ON pc.id = f.partner_company_id",
+    ),
+    "pms_studies": dict(
+        extra_columns="""
+            sp.brand_name || coalesce(' × ' || idis.name_ja, '') AS subject,
+            'PMS（' || f.study_type || '）' AS item, f.title AS content
+        """,
+        extra_join="""
+            JOIN products sp ON sp.id = f.product_id
+            LEFT JOIN indications si ON si.id = f.indication_id
+            LEFT JOIN diseases idis ON idis.id = si.disease_id
+        """,
+    ),
 }
 
 

@@ -6,3 +6,8 @@ document_title,version_label,revised_on,retrieved_on,confirmed_on,source_url,is_
 モックセプト皮下注 添付文書（架空）,2024年10月改訂（第3版）,2024-10,2025-06-15,2025-06-15,https://example.com/mockcept/pi/v3,1,原文確認済み
 架空慢性疾患A 診療ガイドライン（架空）,2023年版,2023-03,2025-06-20,2025-06-20,https://example.com/guideline-a/2023,1,原文確認済み
 架空慢性疾患B 診療ガイドライン（架空）,2024年版,2024-09,2025-06-20,,https://example.com/guideline-b/2024,1,未確認
+サンプリンα錠 RMP（架空）,2025年3月提出（第5版）,2025-03,2025-05-10,2025-05-10,https://example.com/sampurin/rmp/v5,1,原文確認済み
+テスタミドOD錠 RMP（架空）,2025年1月提出（第1版）,2025-01,2025-06-01,,https://example.com/testamid/rmp/v1,1,未確認
+モックセプト皮下注 RMP（架空）,2024年11月提出（第4版）,2024-11,2025-06-15,2025-06-15,https://example.com/mockcept/rmp/v4,1,原文確認済み
+サンプル製薬 決算説明資料（架空）,2024年度 決算説明資料,2025-05,2025-06-01,2025-06-01,https://example.com/sample-pharma/ir/fy2024,1,原文確認済み
+モデル薬品 決算説明資料（架空）,2024年度 決算説明資料,2025-05,2025-06-15,2025-06-15,https://example.com/model-yakuhin/ir/fy2024,1,原文確認済み

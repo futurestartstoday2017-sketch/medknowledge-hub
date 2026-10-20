@@ -147,7 +147,10 @@ def test_version_choices_are_related_documents(loaded):
     """出典として選べる版が、その製品にひも付いた文書の版だけであることを確認します。"""
     fact = next(f for f in list_review_facts(loaded, ["再確認要"]) if f["subject"] == "サンプリンα錠")
     titles = {label.split(" ／ ")[0] for _, label in get_version_choices(loaded, fact)}
-    assert titles == {"サンプリンα錠 添付文書（架空）", "サンプリンα錠 インタビューフォーム（架空）"}
+    assert titles == {"サンプリンα錠 添付文書（架空）", "サンプリンα錠 インタビューフォーム（架空）",
+                      "サンプリンα錠 RMP（架空）", "サンプル製薬 決算説明資料（架空）"}
+    # 別の製品の文書（テスタミド・モックセプトの添付文書など）は選べない
+    assert not any("テスタミド" in t or "モックセプト" in t for t in titles)
 
 
 # ---- 差分・設定 ----
@@ -233,6 +236,8 @@ def test_page_revision_does_not_carry_over_previous_inputs():
     """
     at = open_update_page("山田")
     confirm_selected(at)  # 確認すると一覧から外れ、別の情報が選ばれる
+    # 修正フォームのある医学的情報（テスタミドOD錠の薬効分類、ID 6）に切り替える
+    at.selectbox(key="review_target").set_value("medical_facts:6").run()
     key = at.selectbox(key="review_target").value
     at.text_area(key=f"revise_content_{key}").input("修正した内容（架空）")
     at.text_input(key=f"revise_reason_{key}").input("テスト修正")
