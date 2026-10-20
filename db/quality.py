@@ -7,14 +7,7 @@ DBの制約だけでは防げない「つじつまの合わない状態」を見
 - find_quality_problems()：問題の一覧を返す（問題がなければ空のリスト）
 """
 
-from db.database import FACT_TABLES
-
-# 事実のテーブルの日本語名（画面やメッセージ用）
-TABLE_LABELS = {
-    "product_companies": "製造販売元・販売元",
-    "medical_facts": "医学的情報",
-    "safety_info": "安全性情報",
-}
+from db.database import FACT_TABLES, TABLE_LABELS
 
 # 「出典の文書が、その情報の対象（製品・疾患）とつながっているか」を確かめるSQLの条件
 # f は事実のテーブル、v は出典の版を表します

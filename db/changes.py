@@ -9,6 +9,8 @@ changes.py：【出典セット】を持つ「事実」のデータを、更新�
 - supersede_record() ：内容を変える（古い行は残し、新しい行で置き換える）
 - set_status()       ：確認状態（未確認 / 原文確認済み / 再確認要）を変える
 - transaction()      ：複数の処理を1つのトランザクションにまとめる
+- log_change()       ：更新履歴に1行を追記する（事実以外のデータを変えたときにも使う）
+- get_row()          ：1行を辞書で取り出す
 """
 
 import json
@@ -49,7 +51,7 @@ def add_record(conn, table, values, changed_by, reason):
     _check_table(conn, table, values)
     with transaction(conn):  # with の中でエラーが起きたら、すべて取り消される
         new_id = _insert(conn, table, values)
-        _log(conn, table, new_id, "追加", None, _get(conn, table, new_id), changed_by, reason)
+        log_change(conn, table, new_id, "追加", None, get_row(conn, table, new_id), changed_by, reason)
     return new_id
 
 
@@ -61,7 +63,7 @@ def supersede_record(conn, table, old_id, changes, changed_by, reason):
     """
     _check_table(conn, table, changes)
     with transaction(conn):
-        old = _get(conn, table, old_id)
+        old = get_row(conn, table, old_id)
         if old is None:
             raise ValueError(f"{table} に ID {old_id} のデータがありません")
         if not old["is_current"]:
@@ -78,7 +80,7 @@ def supersede_record(conn, table, old_id, changes, changed_by, reason):
         # ③ 古い行に「どの行に置き換えられたか」を記録する
         conn.execute(f"UPDATE {table} SET superseded_by = ? WHERE id = ?", (new_id, old_id))
         # ④ 更新履歴に、変更前と変更後を記録する
-        _log(conn, table, new_id, "置き換え", old, _get(conn, table, new_id), changed_by, reason)
+        log_change(conn, table, new_id, "置き換え", old, get_row(conn, table, new_id), changed_by, reason)
     return new_id
 
 
@@ -90,7 +92,7 @@ def set_status(conn, table, record_id, status, changed_by, reason):
     if status not in STATUSES:
         raise ValueError(f"確認状態は {STATUSES} のどれかにしてください")
     with transaction(conn):
-        before = _get(conn, table, record_id)
+        before = get_row(conn, table, record_id)
         if before is None:
             raise ValueError(f"{table} に ID {record_id} のデータがありません")
         if not before["is_current"]:
@@ -99,16 +101,16 @@ def set_status(conn, table, record_id, status, changed_by, reason):
         if status == "原文確認済み":
             conn.execute(
                 f"UPDATE {table} SET status = ?, verified_by = ?, verified_at = ? WHERE id = ?",
-                (status, changed_by, _now(), record_id),
+                (status, changed_by, now_text(), record_id),
             )
         else:
             conn.execute(f"UPDATE {table} SET status = ? WHERE id = ?", (status, record_id))
-        _log(conn, table, record_id, "状態変更", before, _get(conn, table, record_id), changed_by, reason)
+        log_change(conn, table, record_id, "状態変更", before, get_row(conn, table, record_id), changed_by, reason)
 
 
-# ---- ここから下は、このファイルの中だけで使う補助関数 ----
+# ---- ここから下は補助関数（log_change・get_row・now_text は他のファイルからも使う）----
 
-def _now():
+def now_text():
     """今の日時を「YYYY-MM-DD HH:MM:SS」の文字列で返します。"""
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -138,21 +140,25 @@ def _insert(conn, table, values):
     return cursor.lastrowid
 
 
-def _get(conn, table, record_id):
+def get_row(conn, table, record_id):
     """1行を取り出して、辞書（列名: 値）にして返します。見つからなければ None。"""
     row = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (record_id,)).fetchone()
     return dict(row) if row else None
 
 
-def _log(conn, table, record_id, action, before, after, changed_by, reason):
-    """更新履歴に1行を追記します。"""
+def log_change(conn, table, record_id, action, before, after, changed_by, reason, candidate_id=None):
+    """
+    更新履歴に1行を追記します。
+    確認者（changed_by）と変更理由（reason）が空だと、DBのルールでエラーになります。
+    """
     def to_json(data):
         return json.dumps(data, ensure_ascii=False) if data is not None else None
 
     conn.execute(
         """
-        INSERT INTO change_log (table_name, record_id, action, before_json, after_json, changed_by, reason)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO change_log
+            (table_name, record_id, action, before_json, after_json, changed_by, reason, candidate_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (table, record_id, action, to_json(before), to_json(after), changed_by, reason),
+        (table, record_id, action, to_json(before), to_json(after), changed_by, reason, candidate_id),
     )

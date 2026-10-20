@@ -13,7 +13,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from db.database import DB_PATH, ROOT
+import db.database as database
+from db.database import ROOT
 
 # バックアップの保存先（.gitignore で GitHub には上げない設定にしています）
 BACKUP_DIR = ROOT / "data" / "backups"
@@ -21,7 +22,8 @@ BACKUP_DIR = ROOT / "data" / "backups"
 
 def backup_db(db_path=None, backup_dir=None):
     """データベースの控えを「medknowledge_日時.db」として保存し、その場所を返します。"""
-    db_path = Path(db_path or DB_PATH)
+    # database.DB_PATH と BACKUP_DIR は「呼ばれた時点」の値を使う（テストで場所を差し替えられるようにするため）
+    db_path = Path(db_path or database.DB_PATH)
     backup_dir = Path(backup_dir or BACKUP_DIR)
     if not db_path.exists():
         raise FileNotFoundError(f"データベースが見つかりません：{db_path}")
@@ -59,7 +61,7 @@ def restore_db(backup_path, db_path=None, backup_dir=None):
     念のため、復元する前の今のデータベースもバックアップしておきます（その場所を返します）。
     """
     backup_path = Path(backup_path)
-    db_path = Path(db_path or DB_PATH)
+    db_path = Path(db_path or database.DB_PATH)
     if not backup_path.exists():
         raise FileNotFoundError(f"バックアップが見つかりません：{backup_path}")
     if not check_integrity(backup_path):

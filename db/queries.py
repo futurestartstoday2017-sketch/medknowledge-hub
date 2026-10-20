@@ -7,7 +7,7 @@ queries.py：画面に表示するためのデータを、データベースか�
 
 import pandas as pd
 
-from db.database import FACT_TABLES
+from db.database import FACT_TABLES, TABLE_LABELS
 
 # 一覧表で、確認状態を文字の前に付ける印（SQLの中で使う）
 _STATUS_ICON_SQL = """
@@ -207,6 +207,149 @@ def get_notes(conn, product_id=None, disease_id=None):
         f"SELECT * FROM notes WHERE {column} = ? ORDER BY note_type, updated_at DESC", (value,)
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------
+# 確認・更新管理
+# ---------------------------------------------------------------------
+
+# 事実のテーブルごとに、「対象（製品名・疾患名）」「項目」「内容」を取り出すための追加のSQL
+FACT_SUBJECTS = {
+    "medical_facts": dict(
+        extra_columns="""
+            coalesce(sp.brand_name, sd.name_ja, ip.brand_name || ' × ' || idis.name_ja) AS subject,
+            f.fact_type AS item
+        """,
+        extra_join="""
+            LEFT JOIN products sp    ON sp.id = f.product_id
+            LEFT JOIN diseases sd    ON sd.id = f.disease_id
+            LEFT JOIN indications si ON si.id = f.indication_id
+            LEFT JOIN products ip    ON ip.id = si.product_id
+            LEFT JOIN diseases idis  ON idis.id = si.disease_id
+        """,
+    ),
+    "safety_info": dict(
+        extra_columns="sp.brand_name AS subject, f.category AS item",
+        extra_join="JOIN products sp ON sp.id = f.product_id",
+    ),
+    "product_companies": dict(
+        extra_columns="sp.brand_name AS subject, f.role AS item, c.name_ja AS content",
+        extra_join="JOIN products sp ON sp.id = f.product_id JOIN companies c ON c.id = f.company_id",
+    ),
+}
+
+
+def list_review_facts(conn, statuses):
+    """
+    指定した確認状態の「今の情報」を、すべての事実のテーブルから集めて返します。
+    1件ごとに table（テーブル名）と table_label（日本語名）が付いた辞書のリストです。
+    再確認要 → 未確認 → 原文確認済み の順に並べます。
+    """
+    if not statuses:
+        return []
+    placeholders = ", ".join("?" * len(statuses))
+    facts = []
+    for table in FACT_TABLES:
+        for fact in fetch_facts(conn, table, f"f.status IN ({placeholders})", list(statuses),
+                                **FACT_SUBJECTS[table]):
+            facts.append({**fact, "table": table, "table_label": TABLE_LABELS[table]})
+    order = {"再確認要": 0, "未確認": 1, "原文確認済み": 2}
+    return sorted(facts, key=lambda f: (order[f["status"]], f["table_label"], f["subject"], f["id"]))
+
+
+def get_fact_detail(conn, table, fact_id):
+    """事実を1件、出典・対象・項目つきで返します（今の情報だけ）。"""
+    rows = fetch_facts(conn, table, "f.id = ?", (fact_id,), **FACT_SUBJECTS[table])
+    return {**rows[0], "table": table, "table_label": TABLE_LABELS[table]} if rows else None
+
+
+def get_version_choices(conn, fact):
+    """
+    事実の出典として選べる「文書の版」の一覧を返します：[(版のID, 表示名), ...]
+    対象の製品・疾患にひも付いた文書の版と、今の出典の版を並べます。
+    """
+    product_ids, disease_ids = set(), set()
+    if fact.get("product_id"):
+        product_ids.add(fact["product_id"])
+    if fact.get("disease_id"):
+        disease_ids.add(fact["disease_id"])
+    if fact.get("indication_id"):
+        row = conn.execute("SELECT product_id, disease_id FROM indications WHERE id = ?",
+                           (fact["indication_id"],)).fetchone()
+        product_ids.add(row["product_id"])
+        disease_ids.add(row["disease_id"])
+
+    p_marks = ", ".join("?" * len(product_ids)) or "NULL"
+    d_marks = ", ".join("?" * len(disease_ids)) or "NULL"
+    rows = conn.execute(f"""
+        SELECT v.id, d.title, v.version_label, v.is_current
+        FROM document_versions v JOIN documents d ON d.id = v.document_id
+        WHERE v.id = ? OR d.id IN (
+            SELECT document_id FROM document_links
+            WHERE product_id IN ({p_marks}) OR disease_id IN ({d_marks}))
+        ORDER BY d.title, v.is_current DESC, v.revised_on DESC
+    """, [fact["source_version_id"], *product_ids, *disease_ids]).fetchall()
+    return [(r["id"], f"{r['title']} ／ {r['version_label']}" + ("" if r["is_current"] else "（過去の版）"))
+            for r in rows]
+
+
+def list_companies(conn):
+    """企業の一覧を返します：[(企業ID, 企業名), ...]"""
+    return [(r["id"], r["name_ja"]) for r in conn.execute("SELECT id, name_ja FROM companies ORDER BY name_ja")]
+
+
+def list_all_documents(conn):
+    """すべての文書を返します：[(文書ID, 表示名), ...]"""
+    rows = conn.execute("SELECT id, doc_type, title FROM documents ORDER BY doc_type, title")
+    return [(r["id"], f"{r['title']}（{r['doc_type']}）") for r in rows]
+
+
+def list_all_versions(conn):
+    """すべての文書の版を、表（DataFrame）で返します。"""
+    return pd.read_sql_query("""
+        SELECT v.id AS 版ID, d.title AS 文書, v.version_label AS 版,
+               CASE v.is_current WHEN 1 THEN '最新版' ELSE '過去の版' END AS 区分,
+               coalesce(v.revised_on, '記載なし') AS 改訂年月, v.retrieved_on AS 入手日,
+               coalesce(v.confirmed_on, '—') AS 確認日,
+               CASE v.status WHEN '原文確認済み' THEN '✅ ' WHEN '再確認要' THEN '🔁 ' ELSE '⚠️ ' END
+                   || v.status AS 確認状態,
+               v.source_url AS 原文URL
+        FROM document_versions v JOIN documents d ON d.id = v.document_id
+        ORDER BY d.title, v.is_current DESC, v.revised_on DESC
+    """, conn)
+
+
+def list_candidates(conn):
+    """変更候補の一覧を、表（DataFrame）で返します。未対応・確認中を上に並べます。"""
+    return pd.read_sql_query("""
+        SELECT c.id AS 候補ID, c.status AS 対応状況, d.title AS 文書, c.description AS 内容,
+               c.detected_at AS 検出日時, c.detection_method AS 検出方法,
+               coalesce(v.version_label, '—') AS 新しい版,
+               coalesce(c.resolved_by, '—') AS 対応者, coalesce(c.resolved_at, '—') AS 対応日時
+        FROM change_candidates c
+        JOIN documents d ON d.id = c.document_id
+        LEFT JOIN document_versions v ON v.id = c.new_version_id
+        ORDER BY CASE c.status WHEN '未対応' THEN 0 WHEN '確認中' THEN 1 ELSE 2 END, c.detected_at DESC
+    """, conn)
+
+
+def list_change_log(conn, table=None, limit=200):
+    """更新履歴を新しい順に、表（DataFrame）で返します。table を渡すとそのテーブルだけにしぼります。"""
+    where, params = ("WHERE table_name = ?", [table]) if table else ("", [])
+    log = pd.read_sql_query(f"""
+        SELECT id AS 履歴ID, changed_at AS 日時, changed_by AS 確認者, action AS 操作,
+               table_name AS 対象, record_id AS 対象ID, reason AS 理由
+        FROM change_log {where}
+        ORDER BY id DESC LIMIT {int(limit)}
+    """, conn, params=params)
+    log["対象"] = log["対象"].map(lambda t: TABLE_LABELS.get(t, t))
+    return log
+
+
+def get_change_log_entry(conn, log_id):
+    """更新履歴を1件、辞書で返します。"""
+    row = conn.execute("SELECT * FROM change_log WHERE id = ?", (log_id,)).fetchone()
+    return dict(row) if row else None
 
 
 # ---------------------------------------------------------------------

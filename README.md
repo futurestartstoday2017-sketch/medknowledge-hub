@@ -62,6 +62,7 @@ python -m db.backup list
 python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 ```
 
+「更新管理」画面でデータを変更するときは、その画面を開いてから最初の変更の前に、自動でバックアップを取ります。
 復元するときは、壊れていないかを自動でチェックします。また、復元前のデータベースも念のためバックアップとして残します。
 データベースとバックアップは、GitHubにはアップロードされません。
 
@@ -76,10 +77,13 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 | `db/changes.py` | 事実のデータを、更新履歴を残しながら登録・変更する処理 |
 | `db/quality.py` | 出典と版の不整合を見つける品質チェック |
 | `db/backup.py` | バックアップと復元 |
+| `db/settings.py` | アプリの設定（前回の確認者名など）の保存 |
 | `db/queries.py` | 画面に表示するデータを取り出す処理 |
 | `components/display.py` | 画面で共通して使う表示の部品（確認状態の印・出典の表示など） |
 | `services/search.py` | 横断検索（製品・疾患・文書・医学的情報をまとめて探す） |
 | `services/comparison.py` | 競合製品比較の表と、出典の一覧を作る処理 |
+| `services/updates.py` | 確認・更新管理の処理（内容の修正、新しい版の登録、変更候補） |
+| `services/diff.py` | 変更前と変更後の差分を作る処理 |
 | `services/sample_loader.py` | 架空データのCSVをデータベースに登録する処理 |
 | `services/` | CSVインポートなど、画面から使う処理 |
 | `data/templates/` | CSVテンプレート（見出し行のみ） |
@@ -103,7 +107,7 @@ python -m db.backup restore data\backups\medknowledge_20251020_153000.db
 - [x] Step 4：架空データの登録
 - [x] Step 5：製品・疾患画面
 - [x] Step 6：横断検索・競合製品比較
-- [ ] Step 7：確認・更新管理画面
+- [x] Step 7：確認・更新管理画面
 - [ ] Step 8：CSVインポート
 - [ ] Step 9：承認・再審査・特許・ライセンス
 - [ ] Step 10〜11：臨床試験（ClinicalTrials.gov 取得は利用条件の確認後）

@@ -36,6 +36,24 @@ FACT_TABLES = {
 }
 
 
+# テーブルの日本語名（画面やメッセージで使う）
+TABLE_LABELS = {
+    "companies": "企業",
+    "products": "製品",
+    "diseases": "疾患",
+    "indications": "適応症",
+    "documents": "文書",
+    "document_versions": "文書の版",
+    "document_links": "文書と製品・疾患の対応",
+    "product_companies": "製造販売元・販売元",
+    "medical_facts": "医学的情報",
+    "safety_info": "安全性情報",
+    "notes": "学習メモ",
+    "change_candidates": "変更候補",
+    "change_log": "更新履歴",
+}
+
+
 def get_connection(db_path=None):
     """データベースに接続し、接続（コネクション）を返します。"""
     conn = sqlite3.connect(db_path or DB_PATH)
