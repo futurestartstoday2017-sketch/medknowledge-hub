@@ -1,0 +1,9 @@
+# config.toml：Streamlitの見た目（テーマ）の設定ファイルです。
+# 白を基調にしたシンプルなデザインにしています。
+
+[theme]
+base = "light"                    # 明るいテーマを使う
+primaryColor = "#1f6feb"          # ボタンなどの強調色（青）
+backgroundColor = "#ffffff"       # メイン画面の背景色（白）
+secondaryBackgroundColor = "#f5f7fa"  # サイドバーなどの背景色（薄いグレー）
+textColor = "#1f2328"             # 文字の色（黒に近いグレー）
