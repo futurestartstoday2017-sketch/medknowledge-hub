@@ -67,8 +67,8 @@ FIELD_SPECS = {
         ("progress", "実施状況", "select", ["計画中", "実施中", "終了", "結果公表済み", "未確認"]),
         ("target_cases", "目標症例数", "text", None),
         ("disclosure", "実施期間の公開状況", "select", DISCLOSURES),
-        ("start_date", "実施期間の開始日", "date", None),
-        ("end_date", "実施期間の終了日", "date", None),
+        ("start_date", "実施期間の開始日", "month_or_date", None),
+        ("end_date", "実施期間の終了日", "month_or_date", None),
         ("registration_no", "登録番号（jRCT など）", "text", None),
     ],
     # ---- 臨床試験（Step 10）。スポンサーの企業とのひも付けは CSV で行う ----

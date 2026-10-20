@@ -82,7 +82,7 @@ API・AIで取得・抽出した情報は「未確認」で保存し、人が原
 | reexaminations ◆ | 9 | 再審査期間・終了日（disclosure 付き） |
 | patents ◆ | 9 | 特許番号、種類、満了日、延長後の満了日（disclosure 付き） |
 | licenses ◆ | 9 | 導入元・提携先、契約の種類、地域、契約期間、開示年度（disclosure 付き） |
-| pms_studies ◆ | 9 | PMS（製造販売後調査等）：調査の種類、全例調査か、承認条件か、実施状況、目標症例数、実施期間（disclosure 付き）、登録番号 |
+| pms_studies ◆ | 9 | PMS（製造販売後調査等）：調査の種類、全例調査か、承認条件か、実施状況、目標症例数、実施期間（disclosure 付き。YYYY-MM-DD か YYYY-MM：バージョン4〔`004_pms_month.sql`〕から）、登録番号 |
 
 承認・再審査・特許・ライセンス・PMS は設計図バージョン2（`db/migrations/002_regulatory_pms.sql`）で追加。
 
@@ -100,6 +100,8 @@ API・AIで取得・抽出した情報は「未確認」で保存し、人が原
 - `db/schema.sql` = バージョン1（変更しない）。以降の変更は `db/migrations/` に番号付きのSQLとして追加し、
   `db/database.py` の `SCHEMA_VERSION` と `MIGRATIONS` に登録する。
 - 新しいDBも既存のDBも、同じ手順（バージョン1から順に）で作られる。既存のDBを変更する前に自動でバックアップを取る。
+- テーブルのルール（CHECK）を変えるときは、テーブルを作り直す（例：`004_pms_month.sql`。古いテーブルの名前を変える → 新しいルールで作る →
+  データを id ごと写す → 古いテーブルを消す → 索引・トリガーを作り直す。事実のテーブルを守るトリガーは `database.py` が自動で付ける）。
 
 ### D 臨床試験（Step 10〜11）
 

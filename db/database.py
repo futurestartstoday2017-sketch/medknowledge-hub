@@ -22,7 +22,7 @@ MODES = {"sample": "🧪 架空データ（動作確認用）", "real": "📘 �
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 # 設計図のバージョン番号。テーブルの形を変えたら数字を上げ、MIGRATIONS に追加分のSQLを登録する
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # マイグレーション（古いDBを新しい設計図の形にするための追加分のSQL）の場所と一覧
 #   バージョン1 = schema.sql（最初の設計図）
@@ -31,6 +31,7 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 MIGRATIONS = {
     2: "002_regulatory_pms.sql",  # 承認・再審査・特許・ライセンス・PMS
     3: "003_trials.sql",          # 臨床試験
+    4: "004_pms_month.sql",       # PMSの実施期間に年月（YYYY-MM）も入れられるようにする
 }
 
 # 【出典セット】を持つ「事実」のテーブルと、あとから書き換えてはいけない列の一覧
