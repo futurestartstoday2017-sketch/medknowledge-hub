@@ -32,7 +32,8 @@ tabs = st.tabs(["CSVインポート", "バックアップ"])
 # 1. CSVインポート
 # =====================================================================
 with tabs[0]:
-    st.caption("取り込む順番：① 製品・疾患 → ② 文書と版 → ③ 適応症（先に登録したものを、あとのCSVで参照するため）")
+    st.caption("取り込む順番：① 企業・製品・疾患 → ② 文書と版 → ③ 適応症 → ④ 承認・再審査・特許・ライセンス・PMS"
+               "（先に登録したものを、あとのCSVで参照するため）")
 
     kind = st.radio("取り込む種類", list(KINDS), format_func=lambda k: KINDS[k]["label"], horizontal=True,
                     key="import_kind")
@@ -58,6 +59,9 @@ with tabs[0]:
         if kind == "documents":
             st.caption("「最新版」を「はい」（空欄も「はい」）にすると、それまでの最新版は過去の版になり、"
                        "その版を出典にしていた確認済みの情報は「🔁 再確認要」になります。")
+        if "fact_table" in spec:
+            st.caption("出典（文書タイトル・版・該当箇所）が必須です。取り込んだ情報は「⚠️ 未確認」で登録されます。"
+                       "公開状況が「非公開」「未確認」のときは、日付を空欄にしてください（推測で埋めないため）。")
 
     # ---- ファイルの読み込みと検証 ----
     uploaded = st.file_uploader("CSVファイルを選ぶ", type=["csv"], key=f"upload_{kind}")
@@ -100,7 +104,7 @@ with tabs[0]:
                             st.session_state["flash"] = (
                                 f"{spec['label']}を {count} 行登録しました（登録前のバックアップ：{backup_path.name}）。"
                                 + ("医学的情報は「⚠️ 未確認」です。更新管理画面で原文を確認してください。"
-                                   if kind == "indications" else ""))
+                                   if kind == "indications" or "fact_table" in spec else ""))
                             # アップロード欄を空に戻す（同じファイルを二重に登録しないため）
                             st.session_state.pop(f"upload_{kind}", None)
                             st.rerun()
