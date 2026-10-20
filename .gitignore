@@ -5,9 +5,18 @@
 
 # Pythonが自動で作るキャッシュファイル
 __pycache__/
+*.pyc
+
+# テストツール（pytest）が自動で作るキャッシュ
+.pytest_cache/
 
 # パスワードやAPIキーなどの秘密情報を書くファイル
 .env
+.env.*
+.streamlit/secrets.toml
+secrets.toml
 
-# SQLiteのデータベースファイル（サンプルデータから自動で作り直せるため）
+# データベースファイル（自分で登録したデータが入るため、公開しない）
 *.db
+*.sqlite
+*.sqlite3
