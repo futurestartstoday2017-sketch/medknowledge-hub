@@ -59,9 +59,7 @@ def test_templates_match_definitions():
     """data/templates/ のテンプレートの見出しが、取り込みの定義と一致していることを確認します。"""
     for kind, spec in KINDS.items():
         # 改行の違い（Windows の CRLF と LF）は、Git が自動で変えることがあるので無視して比べる
-        content = (TEMPLATES_DIR / spec["file"]).read_bytes().replace(b"
-", b"
-")
+        content = (TEMPLATES_DIR / spec["file"]).read_bytes().replace(b"\r\n", b"\n")
         assert content == template_bytes(kind), f"{spec['file']} が古くなっています"
 
 
